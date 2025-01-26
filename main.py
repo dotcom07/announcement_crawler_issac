@@ -5,6 +5,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from config.site_config import SITES
 from modules.announcement_crawler import AnnouncementCrawler
+from modules.announcement_crawler_for_notice_list import ListAnnouncementCrawler
 
 
 def setup_logger():
@@ -20,11 +21,13 @@ def setup_logger():
 def process_site(source, crawler):
     """
     스레드 풀에서 실행할 함수.
-    최대 2번까지 새 공지가 있는지 확인하고,
-    있으면 크롤링을 진행한다.
+    공지사항 목록 페이지와 일반 공지사항 페이지를 구분하여 크롤링을 진행한다.
     """
     try:
-        crawler.check_for_new_notices(max_checks=1)  # 최대 2번 검사
+        if isinstance(crawler, ListAnnouncementCrawler):
+            crawler.check_for_new_notices(max_pages=10)
+        elif isinstance(crawler, AnnouncementCrawler):
+            crawler.check_for_new_notices(max_checks=1)
     except Exception as e:
         crawler.logger.error(f"[{source}] Error in process_site: {e}")
 
@@ -35,28 +38,44 @@ def main():
     # 1) 사이트별 Crawler 인스턴스 생성
     crawlers = {}
     for source, config in SITES.items():
-        if source != "RC_EDUCATION":
+        if source != "PHYSICS":
             continue
-        crawler = AnnouncementCrawler(
-            source=source,
-            base_url=config["base_url"],
-            start_url=config["start_url"],
-            url_number=config["url_number"],
-            sub_category_selector=config["sub_category_selector"],
-            next_page_selector=config["next_page_selector"],
-            title_selector=config["title_selector"],
-            date_selector=config["date_selector"],
-            author_selector=config["author_selector"],
-            content_selector=config["content_selector"],
-            logger=logger,
-        )
+        if config["next_page_selector"] == "null":
+            crawler = ListAnnouncementCrawler(
+                source=source,
+                base_url=config["base_url"],
+                start_url=config["start_url"],
+                url_number=config["url_number"],
+                sub_category_selector=config["sub_category_selector"],
+                next_page_selector=config["next_page_selector"],
+                title_selector=config["title_selector"],
+                date_selector=config["date_selector"],
+                author_selector=config["author_selector"],
+                content_selector=config["content_selector"],
+                logger=logger,
+            )
+        else:
+             crawler = AnnouncementCrawler(
+                 source=source,
+                 base_url=config["base_url"],
+                 start_url=config["start_url"],
+                 url_number=config["url_number"],
+                 sub_category_selector=config["sub_category_selector"],
+                 next_page_selector=config["next_page_selector"],
+                 title_selector=config["title_selector"],
+                 date_selector=config["date_selector"],
+                 author_selector=config["author_selector"],
+                 content_selector=config["content_selector"],
+                 logger=logger,
+             )
+        
         crawlers[source] = crawler
 
     # 2) 무한 반복(각 사이트 최대 2번 검사 → 병렬 2개까지)
     while True:
         logger.info("=== Start checking all sites ===")
         
-        with ThreadPoolExecutor(max_workers=6) as executor:
+        with ThreadPoolExecutor(max_workers=8) as executor:
             futures = []
             
             for source, crawler in crawlers.items():

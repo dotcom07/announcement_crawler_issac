@@ -15,13 +15,20 @@ class AnnouncementParser(Parser):
             "ACADEMIC_NOTICE": self.handle_academic_notice,
             "BUSINESS_SCHOOL": self.handle_business_school,
             "CHEMICAL_ENGINEERING": self.handle_chemical_engineering,
+            "SONGDO_DORM": self.handle_songdo_dorm,
+            "INTERNATIONAL_COLLEGE_STUDENT_SERVICES": self.handle_international_college,
+            "INTERNATIONAL_COLLEGE_ACADEMIC_AFFAIRS" : self.handle_international_college, # UIC 추가
+            "ATMOSPHERIC_SCIENCE": self.handle_atmospheric_science,  # 대기과학과 추가
+            "PHYSICAL_EDUCATION": self.handle_physical_education,  # 체육교육학과 추가
         }
         self.file_handlers = {
             "SOCIOLOGY": self.handle_sociology_files,
             "CHEMICAL_ENGINEERING": self.handle_chemical_engineering_files,
             "CHEMISTRY": self.handle_chemistry_files,
             "EARTH_SYSTEM_SCIENCE": self.handle_earth_system_science_files,
+            "GLOBAL_TALENT_COLLEGE": self.handle_global_talent_college_files,
         }
+        self.logger = logger
 
     # 상위 클래스 Parser의 extract_file_links를 오버라이드
     def extract_file_links(self, soup, base_url, source=None):
@@ -132,6 +139,20 @@ class AnnouncementParser(Parser):
                         })
         return files
 
+    def handle_global_talent_college_files(self, soup, base_url):
+        files = []
+        for button in soup.find_all('button', class_='kboard-button-download'):
+            onclick = button.get('onclick', '')
+            href_match = re.search(r"window\.location\.href='([^']+)'", onclick)
+            if href_match:
+                file_url = urljoin(base_url, href_match.group(1))
+                file_name = button.get('title', '') or button.get_text(strip=True)
+                files.append({
+                    "name": file_name,
+                    "url": file_url
+                })
+        return files
+
     def extract_domain(self,url):
         try:
             parsed_url = urlparse(url)
@@ -140,12 +161,70 @@ class AnnouncementParser(Parser):
             print(f"Invalid URL: {e}")
             return None
 
+    def standardize_date(self, date_text):
+        """
+        다양한 날짜 형식을 YYYY-MM-DD 형식으로 표준화
+        """
+        if not date_text:
+            return ""
+        
+        # 불필요한 텍스트 제거
+        remove_words = [
+            "작성일", "등록일", "날짜", "게시일", ":", "작성일자",
+            "작성 일자", "게시 일자", "등록 일자"
+        ]
+        for word in remove_words:
+            date_text = date_text.replace(word, "")
+        
+        # 앞뒤 공백 제거
+        date_text = date_text.strip()
+        
+        # 시간 정보가 있는 경우 날짜만 추출
+        # 예: "2024-04-26 09:17" -> "2024-04-26"
+        date_parts = date_text.split()
+        if date_parts:
+            date_text = date_parts[0]
+        
+        # 이미 YYYY-MM-DD 형식인 경우
+        if re.match(r'^\d{4}-\d{2}-\d{2}$', date_text):
+            return date_text
+        
+        try:
+            # YYYY.MM.DD 형식 처리
+            if re.match(r'^\d{4}\.\d{2}\.\d{2}$', date_text):
+                return date_text.replace('.', '-')
+            
+            # YY.MM.DD 형식 처리
+            if re.match(r'^\d{2}\.\d{2}\.\d{2}$', date_text):
+                year = int(date_text[:2])
+                year = f"20{year}" if year < 50 else f"19{year}"
+                return f"{year}-{date_text[3:5]}-{date_text[6:8]}"
+            
+            # YYYYMMDD 형식 처리
+            if re.match(r'^\d{8}$', date_text):
+                return f"{date_text[:4]}-{date_text[4:6]}-{date_text[6:]}"
+            
+            # YYYY/MM/DD 형식 처리
+            if re.match(r'^\d{4}/\d{2}/\d{2}$', date_text):
+                return date_text.replace('/', '-')
+            
+            # YY/MM/DD 형식 처리
+            if re.match(r'^\d{2}/\d{2}/\d{2}$', date_text):
+                year = int(date_text[:2])
+                year = f"20{year}" if year < 50 else f"19{year}"
+                return f"{year}-{date_text[3:5]}-{date_text[6:8]}"
+            
+            self.logger.warning(f"Unknown date format: {date_text}")
+            return date_text
+        
+        except Exception as e:
+            self.logger.error(f"Error standardizing date '{date_text}': {str(e)}")
+            return date_text
+
     def parse_notice(self, soup, base_domain, url, source, title_selector, date_selector, author_selector, content_selector, sub_category_selector):
         """
         프론트에 넘겨줄 JSON 구조에 맞게 파싱하는 메서드.
         """
-
-        print(soup)
 
         # tables = []
 
@@ -165,7 +244,8 @@ class AnnouncementParser(Parser):
         sub_category = sub_category_tag.get_text(strip=True) if sub_category_tag else ""
 
         date = soup.select_one(date_selector)
-        date_text = date.get_text(strip=True).replace("작성일", "").strip() if date else ""
+        date_text = date.get_text(strip=True) if date else ""
+        date_text = self.standardize_date(date_text)
 
         # content: .fr-view 내부 HTML 전부
         content_element = soup.select_one(content_selector)
@@ -251,4 +331,89 @@ class AnnouncementParser(Parser):
             date_text = date_li.get_text(strip=True).replace('날짜', '').strip()
             if date_text:
                 date_text = date_text.replace('.', '-')
+        return sub_category, author_text, date_text
+
+    def handle_songdo_dorm(self, soup, sub_category, author_text, date_text):
+        date_div = soup.select_one("#BBSBoardViewDate2")
+        if date_div:
+            # "날짜2024-10-17" 형식에서 날짜만 추출
+            date_text = date_div.get_text(strip=True).replace("날짜", "").strip()
+        return sub_category, author_text, date_text
+    
+    def handle_international_college(self, soup, sub_category, author_text, date_text):
+        """
+        UIC 게시판 날짜 파싱
+        예: "Jan 20, 2025" -> "2025-01-20"
+        """
+        date_div = soup.select_one("#BoardViewAdd")
+        if date_div:
+            # "Jan 20, 2025  |  Read: 398" 형식에서 날짜만 추출
+            date_str = date_div.get_text(strip=True).split('|')[0].strip()
+            
+            # 월 이름을 숫자로 변환하기 위한 매핑
+            month_map = {
+                'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
+                'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08',
+                'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+            }
+            
+            try:
+                # "Jan 20, 2025" 파싱
+                month_str, day_str, year_str = date_str.replace(',', '').split()
+                month = month_map.get(month_str, '01')  # 기본값 01
+                day = day_str.zfill(2)  # 한 자리 날짜를 두 자리로
+                
+                # YYYY-MM-DD 형식으로 변환
+                date_text = f"{year_str}-{month}-{day}"
+            except Exception as e:
+                self.logger.warning(f"Failed to parse date: {date_str} - {e}")
+        
+        return sub_category, author_text, date_text
+
+    def handle_atmospheric_science(self, soup, sub_category, author_text, date_text):
+        """
+        대기과학과 게시판 날짜 파싱
+        예: "December 22, 2021" -> "2021-12-22"
+        """
+        date_p = soup.select_one("p.text-muted.text-uppercase.mb-small.text-right")
+        if date_p:
+            date_str = date_p.get_text(strip=True)
+            
+            # 월 이름을 숫자로 변환하기 위한 매핑 (대소문자 구분 없이)
+            month_map = {
+                'january': '01', 'february': '02', 'march': '03', 'april': '04',
+                'may': '05', 'june': '06', 'july': '07', 'august': '08',
+                'september': '09', 'october': '10', 'november': '11', 'december': '12',
+                'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04',
+                'jun': '06', 'jul': '07', 'aug': '08',
+                'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12'
+            }
+            
+            try:
+                # "December 22, 2021" 파싱
+                month_str, day_str, year_str = date_str.replace(',', '').split()
+                month = month_map.get(month_str.lower(), '01')  # 대소문자 구분 없이 처리
+                day = day_str.zfill(2)  # 한 자리 날짜를 두 자리로
+                
+                # YYYY-MM-DD 형식으로 변환
+                date_text = f"{year_str}-{month}-{day}"
+            except Exception as e:
+                self.logger.warning(f"Failed to parse date: {date_str} - {e}")
+        
+        return sub_category, author_text, date_text
+
+    def handle_physical_education(self, soup, sub_category, author_text, date_text):
+        """
+        체육교육학과 게시판 날짜 파싱
+        예: "게시일 : 2024-07-11" -> "2024-07-11"
+        """
+        date_div = soup.select_one("div.article-date")
+        if date_div:
+            # "게시일 : " 제거하고 날짜만 추출
+            date_text = date_div.get_text(strip=True).replace("게시일 :", "").strip()
+            
+            # YYYY-MM-DD 형식 검증
+            if re.match(r'^\d{4}-\d{2}-\d{2}$', date_text):
+                return sub_category, author_text, date_text
+            
         return sub_category, author_text, date_text
