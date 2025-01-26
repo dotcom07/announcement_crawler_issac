@@ -20,6 +20,7 @@ class AnnouncementParser(Parser):
             "INTERNATIONAL_COLLEGE_ACADEMIC_AFFAIRS" : self.handle_international_college, # UIC 추가
             "ATMOSPHERIC_SCIENCE": self.handle_atmospheric_science,  # 대기과학과 추가
             "PHYSICAL_EDUCATION": self.handle_physical_education,  # 체육교육학과 추가
+            "PHYSICS": self.handle_physics,  # 물리학과 추가
         }
         self.file_handlers = {
             "SOCIOLOGY": self.handle_sociology_files,
@@ -416,4 +417,12 @@ class AnnouncementParser(Parser):
             if re.match(r'^\d{4}-\d{2}-\d{2}$', date_text):
                 return sub_category, author_text, date_text
             
+        return sub_category, author_text, date_text
+
+    def handle_physics(self, soup, sub_category, author_text, date_text):
+        """
+        물리학과 게시판 날짜 파싱
+        예: "2024.12.24" -> "2024-12-24"
+        """
+        # 이미 standardize_date에서 처리되므로 그대로 반환
         return sub_category, author_text, date_text
