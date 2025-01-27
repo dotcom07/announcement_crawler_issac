@@ -274,7 +274,6 @@ class AnnouncementParser(Parser):
 
         title = soup.select_one(title_selector)
         title_text = title.get_text(strip=True) if title else ""
-
         author_tag = soup.select_one(author_selector)
         author_text = author_tag.get_text(strip=True) if author_tag else ""
 
@@ -333,6 +332,111 @@ class AnnouncementParser(Parser):
             "rawContent": content_html,
             "content": plainText,
             "files": extracted_files,
+            # "tables": tables
+        }
+
+        return json_object
+
+    def parse_psychology_notice(self, soup, base_domain, url, source, title_selector, date_selector, author_selector, content_selector, sub_category_selector, article_id):
+        """
+        프론트에 넘겨줄 JSON 구조에 맞게 파싱하는 메서드.
+        """
+        # tables = []
+
+        # subCategory, author 추출
+        sub_category = ""
+        author_text = ""
+        plainText = ""
+        content_html = ""
+        title=""
+        # 특정 section_id에 해당하는 section 찾기
+        section = soup.find("section", id=article_id)
+
+        if not section:
+            return f"Section with id '{article_id}' not found."
+        
+        # section 내부의 class='C9DxTc'인 태그 찾기
+        text_elements = section.find_all(class_="C9DxTc")
+        if text_elements:
+            # 텍스트 합치기
+            title = " ".join([element.get_text(strip=True) for element in text_elements]) 
+        else:
+            # iframe 태그 중 jsname="L5Fo6c"인 친구 찾기
+            iframe_element = section.find("iframe", attrs={"jsname": "L5Fo6c"})
+            if iframe_element:
+                title = iframe_element.get("aria-label")
+            else:
+                print("No iframe with jsname='L5Fo6c' found.")
+
+        # section 내부의 class='oKdM2c ZZyype'인 태그 찾기
+        content_elements = section.find_all(class_="oKdM2c ZZyype")
+        if content_elements:
+            # 순수 텍스트 합치기 (HTML 태그 제거)
+            plainText = " ".join([element.get_text(strip=True) for element in content_elements])
+
+            # src 및 href 처리 (이미지나 링크가 상대경로로 되어 있을 경우 base_domain 추가)
+            for element in content_elements:
+                # src 처리
+                for img in element.find_all('img', src=True):
+                    src = img['src']
+                    if src.startswith('/'):
+                        img['src'] = urljoin(base_domain, src)
+
+                # href 처리
+                for a_tag in element.find_all('a', href=True):
+                    href = a_tag['href']
+                    if not href.startswith('http') and not href.startswith('javascript'):
+                        a_tag['href'] = urljoin(base_domain, href)
+
+            # HTML 합치기
+            content_html = "".join([str(element) for element in content_elements])
+
+
+            # content가 있으면서 링크 바로가기가 있는 경우
+            first_link_added = False  # 첫 번째 링크인지 확인하는 플래그
+            for link_element in section.find_all('span', class_="C9DxTc aw5Odc"):
+                if not first_link_added:  # 첫 번째 링크에만 <br/><br/> 추가
+                    content_html += "<br/><br/>" + str(link_element)
+                    first_link_added = True
+                else:
+                    content_html += str(link_element)  # 나머지는 그대로 추가
+
+        else:
+            # content_elements가 없을 경우 제목의 내용을 그대로 넣어준다
+            alternative_element = section.find("div", jscontroller="Ae65rd")
+            if alternative_element:
+                # 순수 텍스트 합치기
+                plainText = alternative_element.get_text(strip=True)
+
+                # HTML 내용 가져오기
+                content_html = str(alternative_element)
+
+                # src 및 href 처리
+                for img in alternative_element.find_all('img', src=True):
+                    src = img['src']
+                    if src.startswith('/'):
+                        img['src'] = urljoin(base_domain, src)
+
+                for a_tag in alternative_element.find_all('a', href=True):
+                    href = a_tag['href']
+                    if not href.startswith('http') and not href.startswith('javascript'):
+                        a_tag['href'] = urljoin(base_domain, href)
+
+
+        extracted_files = self.extract_file_links(soup, self.base_domain, source)
+
+        json_object = {
+            "university": "YONSEI",
+            "source": source,
+            "url": url,
+            "subCategory": "",
+            "author": "",
+            "title": title,
+            "createdDate": "",
+            "rawContent": content_html,
+            "content": plainText,
+            "files": extracted_files,
+            "article_id" : article_id
             # "tables": tables
         }
 

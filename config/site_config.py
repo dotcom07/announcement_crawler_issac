@@ -847,5 +847,16 @@ SITES = {
         "sub_category_selector": "null",
         "content_selector": "table > tr > td > div > font.textplain",
         "next_page_selector": "null"
+    },
+    "PSYCHOLOGY": {
+        "base_url": "https://psychsci.yonsei.ac.kr/",
+        "start_url": "https://psychsci.yonsei.ac.kr/",
+        "url_number": "page",
+        "title_selector" : "C9DxTc",
+        "date_selector": "",
+        "author_selector": "",
+        "sub_category_selector": "null",
+        "content_selector": "oKdM2c ZZyype",
+        "next_page_selector": "null"
     }
 }

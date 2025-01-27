@@ -41,6 +41,7 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
             "ATMOSPHERIC_SCIENCE": self._build_list_url_atmospheric_science,
             "PHYSICS": self._build_list_url_physics,
             "POLITICAL_SCIENCE" : self._build_list_url_political_science,
+            "PSYCHOLOGY": self._build_list_url_psychology,
         }
         self.parse_list_page_handlers = {
             "MAIN_DORM": self._parse_list_page_main_dorm,
@@ -56,6 +57,7 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
             "ATMOSPHERIC_SCIENCE": self._parse_list_page_atmospheric_science,
             "PHYSICS": self._parse_list_page_physics,
             "POLITICAL_SCIENCE" : self._parse_list_page_political_science,
+            "PSYCHOLOGY": self._parse_list_page_psychology,
         }
 
         # offset 기반 사이트인지 판별
@@ -67,6 +69,28 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
             "ELECTRICAL_ENGINEERING",
             "MECHANICAL_ENGINEERING",
         ])
+        self.existing_psychology_ids = set()  # 이미 저장된 article_id
+        self._load_existing_psychology_ids()  # 초기화 시 한번 로드
+
+    def _load_existing_psychology_ids(self):
+            """
+            JSONL 파일에서 article_id를 한 번 로드하여 캐시에 저장
+            """
+            if self.source == "PSYCHOLOGY":
+                file_path = os.path.join(self.notices_dir, f"notices_{self.source}.jsonl")
+                if os.path.exists(file_path):
+                    with open(file_path, "r", encoding="utf-8") as file:
+                        for line in file:
+                            try:
+                                record = json.loads(line.strip())
+                                article_id = record.get("article_id")
+                                if article_id:
+                                    self.existing_psychology_ids.add(article_id)
+                            except json.JSONDecodeError as e:
+                                self.logger.warning(f"Failed to parse line: {line}. Error: {e}")
+                    self.logger.info(f"Loaded {len(self.existing_psychology_ids)} existing article_ids for {self.source}")
+                else:
+                    self.logger.info(f"No existing JSONL file found for {self.source}. Starting fresh.")
 
     # --------------------------------------------------
     # A. 메인 진입: 체크 & 크롤링
@@ -104,8 +128,11 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
         session = requests.Session()
         page_list = self._generate_reverse_page_list(max_pages)
 
-        for page_param in page_list:
-            self._process_list_page(session, page_param, first_crawl=True)
+        if self.source =="PSYCHOLOGY" :
+            self._process_list_page(session, 0, first_crawl=True)
+        else :
+            for page_param in page_list:
+                self._process_list_page(session, page_param, first_crawl=True)
 
         session.close()
 
@@ -168,18 +195,32 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
                 return 0
         post_links.sort(key=_to_int_or_zero)
 
-        for post_url, article_id in post_links:
-            if first_crawl:
-                self.logger.info(f"[{self.source}] (Full) Found post: {post_url} (article_id: {article_id})")
-                # self.crawl_notices(post_url, session=session)
-                self.crawl_notices(post_url, session=session, article_id=article_id)
-            else:
-                if self.is_new_post_by_id(article_id):
-                    self.logger.info(f"[{self.source}] Found NEW post: {post_url} (article_id: {article_id})")
-                    self.crawl_notices(post_url, session=session)
+        if self.source == "PSYCHOLOGY":
+            for post_url, article_id in reversed(post_links):  # 역순으로 순회
+                if first_crawl:
+                    self.logger.info(f"[{self.source}] (Full) Found post: {post_url} (article_id: {article_id})")
+                    self.process_notice_detail(soup, post_url, article_id)
                 else:
-                    self.logger.debug(f"[{self.source}] Old post => skip: article_id={article_id}")
+                    if self.is_new_post_by_id(article_id):
+                        self.logger.info(f"[{self.source}] Found NEW post: {post_url} (article_id: {article_id})")
+                        self.process_notice_detail(soup, post_url, article_id)
+                    else:
+                        self.logger.debug(f"[{self.source}] Old post => skip: article_id={article_id}")
 
+        else :
+            for post_url, article_id in post_links:
+                if first_crawl:
+                    self.logger.info(f"[{self.source}] (Full) Found post: {post_url} (article_id: {article_id})")
+                    # self.crawl_notices(post_url, session=session)
+                    self.crawl_notices(post_url, session=session, article_id=article_id)
+                else:
+                    if self.is_new_post_by_id(article_id):
+                        self.logger.info(f"[{self.source}] Found NEW post: {post_url} (article_id: {article_id})")
+                        self.crawl_notices(post_url, session=session)
+                    else:
+                        self.logger.debug(f"[{self.source}] Old post => skip: article_id={article_id}")
+
+    
     # --------------------------------------------------
     # E. 상세 페이지 크롤링
     # --------------------------------------------------
@@ -204,18 +245,45 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
 
         soup = BeautifulSoup(content, "html.parser") 
 
+        self.process_notice_detail(soup, notice_url, article_id)
+
+    # --------------------------------------------------
+    # E-1. 상세 페이지 데이터를 처리하는 메소드
+    # --------------------------------------------------
+    def process_notice_detail(self, soup, notice_url, article_id):
+        """
+        상세 페이지 데이터를 처리하는 메소드:
+        1. HTML -> JSON 변환
+        2. 로컬 JSONL 저장
+        3. Opensearch/ISSAC 전송 (옵션)
+        4. 상태 갱신
+        """
         # (1) HTML -> JSON 변환
-        json_data = self.parser.parse_notice(
-            soup=soup,
-            base_domain=self.parser.extract_domain(notice_url),
-            url=notice_url,
-            source=self.source,
-            title_selector=self.title_selector,
-            date_selector=self.date_selector,
-            author_selector=self.author_selector,
-            content_selector=self.content_selector,
-            sub_category_selector=self.sub_category_selector
-        )
+        if self.source=="PSYCHOLOGY" :
+            json_data = self.parser.parse_psychology_notice(
+                soup=soup,
+                base_domain=self.parser.extract_domain(notice_url),
+                url=notice_url,
+                source=self.source,
+                title_selector=self.title_selector,
+                date_selector=self.date_selector,
+                author_selector=self.author_selector,
+                content_selector=self.content_selector,
+                sub_category_selector=self.sub_category_selector,
+                article_id=article_id
+            )
+        else :
+            json_data = self.parser.parse_notice(
+                soup=soup,
+                base_domain=self.parser.extract_domain(notice_url),
+                url=notice_url,
+                source=self.source,
+                title_selector=self.title_selector,
+                date_selector=self.date_selector,
+                author_selector=self.author_selector,
+                content_selector=self.content_selector,
+                sub_category_selector=self.sub_category_selector
+            )
 
         # (2) 로컬 jsonl 저장
         from .json_manager import JsonManager
@@ -276,6 +344,14 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
         """
         if self.last_article_no is None:
             return True
+        
+        # 심리학의 경우: 로컬 JSONL 파일에서 article_id를 확인
+        if self.source == "PSYCHOLOGY":
+            if article_id in self.existing_psychology_ids:
+                self.logger.info(f"[{self.source}] Skipping existing post: {article_id}")
+                return False
+            return True
+
         try:
             current = int(article_id)
             saved = int(self.last_article_no)
@@ -534,7 +610,7 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
         print(post_links)
         return post_links
     
-     # --------------------------------------------------
+    # --------------------------------------------------
     # K. 정치외교학과 게시판
     # --------------------------------------------------
     def _build_list_url_political_science(self, page_index):
@@ -569,6 +645,50 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
                     # 필요한 데이터만 저장
                     post_links.append((detail_url, article_id))
 
+\
+        return post_links
+
+    # --------------------------------------------------
+    # L. 심리학과 게시판
+    # --------------------------------------------------
+    def _build_list_url_psychology(self, page_index):
+        """
+        심리학과 게시판 목록 URL 생성(POLITICAL_SCIENCE)
+        GET https://psychsci.yonsei.ac.kr/
+        """
+        print(f"{self.base_url}")
+        return f"{self.base_url}"
+
+    def _parse_list_page_psychology(self, soup):
+        """
+        심리학과 게시판 목록 페이지 파싱
+        """
+        post_links = []
+        excluded_ids = {"h.7620e385d18695f5_0", "h.2bc2e14f6cc928f1_3", "h.29ecd76589e67e7d_64"}  # 아예 제외할 ID 집합
+        deferred_ids = {"h.3e89b5824c6d8e90_5", "h.1313e84639b07f9c_4"}  # 나중에 추가할 ID 집합
+        deferred_links = []  # 나중에 추가할 ID 저장
+
+        # div 태그 중 role="main"인 요소 선택
+        main_div = soup.find('div', role='main')
+        if main_div:
+            # main_div 내부에서 class="yaqOZd qeLZfd"를 가진 section 태그 찾기
+            for section in main_div.find_all('section', class_='yaqOZd qeLZfd'):
+                section_id = section.get('id')
+                if section_id:
+                    if section_id in excluded_ids:
+                        # 제외할 ID는 처리하지 않음
+                        continue
+                    elif section_id in deferred_ids:
+                        # 나중에 추가할 ID는 deferred_links에 저장
+                        deferred_links.append((SITES["PSYCHOLOGY"]["start_url"], section_id))
+                    else:
+                        # 일반적인 ID는 바로 post_links에 추가
+                        post_links.append((SITES["PSYCHOLOGY"]["start_url"], section_id))
+
+        # 나중에 추가할 ID를 post_links의 마지막에 추가
+        post_links.extend(deferred_links)
+
+        print(post_links)
         return post_links
 
     
