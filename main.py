@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from config.site_config import SITES
 from modules.announcement_crawler import AnnouncementCrawler
 from modules.announcement_crawler_for_notice_list import ListAnnouncementCrawler
-
+from modules.announcement_crawler_for_ARCHITECTURE_ENGINEERING import ARCHITECTURE_ENGINEERING_AnnouncementCrawler
 
 def setup_logger():
     logger = logging.getLogger("AnnouncementCrawler")
@@ -28,6 +28,8 @@ def process_site(source, crawler):
             crawler.check_for_new_notices(max_pages=10)
         elif isinstance(crawler, AnnouncementCrawler):
             crawler.check_for_new_notices(max_checks=1)
+        elif isinstance(crawler, ARCHITECTURE_ENGINEERING_AnnouncementCrawler):
+            crawler.check_for_new_notices()
     except Exception as e:
         crawler.logger.error(f"[{source}] Error in process_site: {e}")
 
@@ -38,9 +40,24 @@ def main():
     # 1) 사이트별 Crawler 인스턴스 생성
     crawlers = {}
     for source, config in SITES.items():
-        if source != "SCOLARSHIP":
+        if source != "ARCHITECTURE_ENGINEERING":
             continue
-        if config["next_page_selector"] == "null":
+
+        if source == "ARCHITECTURE_ENGINEERING":
+            crawler = ARCHITECTURE_ENGINEERING_AnnouncementCrawler(
+                source=source,
+                base_url=config["base_url"],
+                start_url=config["start_url"],
+                url_number=config["url_number"],
+                sub_category_selector=config["sub_category_selector"],
+                next_page_selector=config["next_page_selector"],
+                title_selector=config["title_selector"],
+                date_selector=config["date_selector"],
+                author_selector=config["author_selector"],
+                content_selector=config["content_selector"],
+                logger=logger,
+            )
+        elif config["next_page_selector"] == "null":
             crawler = ListAnnouncementCrawler(
                 source=source,
                 base_url=config["base_url"],

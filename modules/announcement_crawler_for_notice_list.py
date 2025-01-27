@@ -1,3 +1,5 @@
+# /home/ubuntu/multiturn_ver1/new crawler/modules/announcement_crawler_for_notice_list.py
+
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse, parse_qs
@@ -5,8 +7,8 @@ import logging
 import os
 import json
 import re
-
 from .announcement_crawler import AnnouncementCrawler
+from config.site_config import SITES
 
 class ListAnnouncementCrawler(AnnouncementCrawler):
     """
@@ -20,7 +22,7 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
 
     def __init__(self, source, base_url, start_url, url_number, **kwargs):
         super().__init__(source, base_url, start_url, url_number, **kwargs)
-        self.logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger("AnnouncementCrawler")
 
         # ------------------------------
         # 사이트별 URL 빌드/목록 파싱 핸들러
@@ -38,6 +40,7 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
             "INTERNATIONAL_COLLEGE_ACADEMIC_AFFAIRS" : self._build_list_url_uic_academic_affairs, # UIC 추가
             "ATMOSPHERIC_SCIENCE": self._build_list_url_atmospheric_science,
             "PHYSICS": self._build_list_url_physics,
+            "POLITICAL_SCIENCE" : self._build_list_url_political_science,
         }
         self.parse_list_page_handlers = {
             "MAIN_DORM": self._parse_list_page_main_dorm,
@@ -52,6 +55,7 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
             "INTERNATIONAL_COLLEGE_ACADEMIC_AFFAIRS" : self._parse_list_page_uic_academic_affairs, # UIC 추가
             "ATMOSPHERIC_SCIENCE": self._parse_list_page_atmospheric_science,
             "PHYSICS": self._parse_list_page_physics,
+            "POLITICAL_SCIENCE" : self._parse_list_page_political_science,
         }
 
         # offset 기반 사이트인지 판별
@@ -140,7 +144,11 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
         list_url = self._build_list_url(page_param)
         self.logger.info(f"[{self.source}] Fetching list page: {list_url}")
 
-        content = self.fetcher.fetch_page_content(session, list_url, source=self.source)
+        if(self.source=="POLITICAL_SCIENCE") :
+            content = self.fetcher.fetch_with_form_data(session, list_url, source=self.source, page_param=page_param)
+        else : 
+            content = self.fetcher.fetch_page_content(session, list_url, source=self.source)
+
         if not content:
             self.logger.warning(f"[{self.source}] Failed to fetch list page: {list_url}")
             return
@@ -163,7 +171,8 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
         for post_url, article_id in post_links:
             if first_crawl:
                 self.logger.info(f"[{self.source}] (Full) Found post: {post_url} (article_id: {article_id})")
-                self.crawl_notices(post_url, session=session)
+                # self.crawl_notices(post_url, session=session)
+                self.crawl_notices(post_url, session=session, article_id=article_id)
             else:
                 if self.is_new_post_by_id(article_id):
                     self.logger.info(f"[{self.source}] Found NEW post: {post_url} (article_id: {article_id})")
@@ -174,7 +183,7 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
     # --------------------------------------------------
     # E. 상세 페이지 크롤링
     # --------------------------------------------------
-    def crawl_notices(self, notice_url, session=None):
+    def crawl_notices(self, notice_url, session=None, article_id=None):
         """
         단일 게시글 상세 페이지 파싱 + 저장 + state 갱신
         """
@@ -183,7 +192,12 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
             session = requests.Session()
 
         self.logger.info(f"[{self.source}] Crawling detail page: {notice_url}")
-        content = self.fetcher.fetch_page_content(session, notice_url, source=self.source)
+
+        if(self.source=="POLITICAL_SCIENCE") :
+            content = self.fetcher.fetch_with_form_data(session, notice_url, source=self.source, no=article_id)
+        else :
+            content = self.fetcher.fetch_page_content(session, notice_url, source=self.source)
+
         if not content:
             self.logger.warning(f"[{self.source}] Failed to fetch detail: {notice_url}")
             return
@@ -470,6 +484,10 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
         except:
             pass
         return None
+    
+     # --------------------------------------------------
+    # J. 물리학과 게시판
+    # --------------------------------------------------
 
     def _build_list_url_physics(self, page_index):
         """
@@ -501,6 +519,44 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
                 
                 if article_id:
                     post_links.append((detail_url, article_id))
+        print(post_links)
+        return post_links
+    
+     # --------------------------------------------------
+    # K. 정치외교학과 게시판
+    # --------------------------------------------------
+    def _build_list_url_political_science(self, page_index):
+        """
+        정치외교학과 게시판 목록 URL 생성(POLITICAL_SCIENCE)
+        POST http://politics.yonsei.ac.kr/board.asp
+        """
+        print(f"{self.base_url}/board.asp")
+        return f"{self.base_url}/board.asp"
+
+    def _parse_list_page_political_science(self, soup):
+        """
+        정치외교학과 게시판 목록 페이지 파싱
+        """
+        post_links = []
+
+        # 목록 테이블에서 행 선택
+        rows = soup.select("table.table_com01.board_table_basic > tr")
+
+        for row in rows:
+            # 제목 링크 추출
+            a_tag = row.select_one("td.board_table_subject > a[href^='javascript:view']")
+            if not a_tag:
+                continue
+            
+            href = a_tag.get("href", "")
+            if href:
+                detail_url = SITES["POLITICAL_SCIENCE"]["start_url"]
+                article_id = href.split("(")[1].split(")")[0]  # javascript:view(숫자)에서 숫자 추출
+                
+                if article_id:
+                    # 필요한 데이터만 저장
+                    post_links.append((detail_url, article_id))
+
         print(post_links)
         return post_links
 

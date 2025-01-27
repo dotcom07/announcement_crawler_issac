@@ -23,6 +23,17 @@ SITES = {
         "content_selector": "#jwxe_main_content > div.jwxe_board > div > dl > dd",
         "next_page_selector": "#jwxe_main_content > div.jwxe_board > div > ul > li:nth-child(1) > a",
     },
+    "ARCHITECTURE_ENGINEERING" :{
+        "base_url": "https://arch.yonsei.ac.kr",
+        "start_url": "https://arch.yonsei.ac.kr/notice",
+        "url_number": None,
+        "title_selector": "#body > div.dcore.dcore-view.dcore-notice > div.wrap-with-aside > div:nth-child(1) > div.dcore-body > h1#body > div.dcore.dcore-view.dcore-notice > div.wrap-with-aside > div:nth-child(1) > div.dcore-body > h1",
+        "date_selector": "null",
+        "author_selector": "null",
+        "sub_category_selector": "null",
+        "content_selector": "#body > div.dcore.dcore-view.dcore-notice > div.wrap-with-aside > div:nth-child(1) > div.post-body",
+        "next_page_selector": "null",
+    },
     "MATERIALS_SCIENCE_ENGINEERING" : {
         "base_url": "https://mse.yonsei.ac.kr/",
         "start_url": "https://mse.yonsei.ac.kr/board/board.php?bo_table=notice&cate=undergraduate&pg=2&idx=139",
@@ -826,16 +837,15 @@ SITES = {
         "content_selector": "#board-view-default > div.bw_contents.editor_contents",
         "next_page_selector": "null",
     },
-    "POLITICAL_SCIENCE" :{
-        "base_url": "http://politics.yonsei.ac.kr",
-        "start_url": "http://politics.yonsei.ac.kr/board.asp?catalogid=politics&language=ko&boardcode=com01&go=&field=&keyword=&tapmenu=&page=1",
-        "url_number": "articleNo",
-        "title_selector": "#jwxe_main_content > div > div.board-wrap > div > dl.board-write-box.board-write-box-v01 > dd",
-        "date_selector": "#jwxe_main_content > div > div.board-wrap > div > dl:nth-child(2) > dd",
-        "author_selector": "#jwxe_main_content > div > div.board-wrap > div > dl:nth-child(3) > dd",
+    "POLITICAL_SCIENCE": {
+        "base_url": "http://politics.yonsei.ac.kr/",
+        "start_url": "http://politics.yonsei.ac.kr/board_read.asp",
+        "url_number": "page",
+        "title_selector" : "table.table_com01.board_table_basic > tr:nth-child(3) > td > font > b",
+        "date_selector": "table.table_com01.board_table_basic > tr:nth-child(1) > td.board_readTitle_td:nth-child(4) > font",
+        "author_selector": "table.table_com01.board_table_basic > tr:nth-child(1) > td.board_readTitle_td:nth-child(2) > font",
         "sub_category_selector": "null",
-        "content_selector": "#jwxe_main_content > div > div.board-wrap > div > dl.board-write-box.board-write-box-v03 > dd",
-        "next_page_selector": "null",
+        "content_selector": "table > tr > td > div > font.textplain",
+        "next_page_selector": "null"
     }
-    
 }

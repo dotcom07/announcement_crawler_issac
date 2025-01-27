@@ -7,7 +7,7 @@ from urllib.parse import urljoin, urlparse
 from bs4 import BeautifulSoup
 import logging
 import re
-
+import time
 class AnnouncementParser(Parser):
     def __init__(self, base_domain, logger):
         super().__init__(base_domain, logger)
@@ -21,6 +21,7 @@ class AnnouncementParser(Parser):
             "ATMOSPHERIC_SCIENCE": self.handle_atmospheric_science,  # 대기과학과 추가
             "PHYSICAL_EDUCATION": self.handle_physical_education,  # 체육교육학과 추가
             "PHYSICS": self.handle_physics,  # 물리학과 추가
+            "POLITICAL_SCIENCE" : self.handle_political_science,
         }
         self.file_handlers = {
             "SOCIOLOGY": self.handle_sociology_files,
@@ -28,6 +29,7 @@ class AnnouncementParser(Parser):
             "CHEMISTRY": self.handle_chemistry_files,
             "EARTH_SYSTEM_SCIENCE": self.handle_earth_system_science_files,
             "GLOBAL_TALENT_COLLEGE": self.handle_global_talent_college_files,
+             "POLITICAL_SCIENCE" : self.handle_political_science_files,
         }
         self.logger = logger
 
@@ -90,7 +92,6 @@ class AnnouncementParser(Parser):
         for link in soup.find_all('a', onclick=True):
             onclick = link.get('onclick', '')
             file_id_match = re.search(r"fwBbs\.Down\('(\d+)'\)", onclick)
-            print(file_id_match)
             if file_id_match:
                 file_id = file_id_match.group(1)
                 file_name = link.get('title', '') or link.get_text(strip=True)
@@ -152,6 +153,25 @@ class AnnouncementParser(Parser):
                     "name": file_name,
                     "url": file_url
                 })
+        return files
+    
+    def handle_political_science_files(self, soup, base_url):
+        files = []
+        # 파일 정보를 포함한 td 태그 선택
+        file_elements = soup.select("td.board_file_basic a")
+
+        for file_element in file_elements:
+            file_url = file_element.get("href", "").strip()
+            file_name = file_element.select_one("u").text.strip() if file_element.select_one("u") else file_element.text.strip()
+            
+            if file_url:
+                # 절대경로로 변환
+                full_url = urljoin(base_url, file_url)
+                files.append({
+                    "name": file_name,
+                    "url": full_url
+                })
+        
         return files
 
     def extract_domain(self,url):
@@ -219,6 +239,11 @@ class AnnouncementParser(Parser):
                 year = f"20{year}" if year < 50 else f"19{year}"
                 return f"{year}-{date_text[3:5]}-{date_text[6:8]}"
             
+            # YYYY.MM.DD / HH:MM 형식 처리
+            if re.match(r'^\d{4}\.\d{2}\.\d{2} / \d{2}:\d{2}$', date_text):
+                date_only = date_text.split('/')[0].strip()
+                return date_only.replace('.', '-')
+            
             self.logger.warning(f"Unknown date format: {date_text}")
             return date_text
         
@@ -230,7 +255,6 @@ class AnnouncementParser(Parser):
         """
         프론트에 넘겨줄 JSON 구조에 맞게 파싱하는 메서드.
         """
-
         # tables = []
 
         # subCategory, author 추출
@@ -429,4 +453,7 @@ class AnnouncementParser(Parser):
         예: "2024.12.24" -> "2024-12-24"
         """
         # 이미 standardize_date에서 처리되므로 그대로 반환
+        return sub_category, author_text, date_text
+    
+    def handle_political_science(self, soup, sub_category, author_text, date_text):
         return sub_category, author_text, date_text
