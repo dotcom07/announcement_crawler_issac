@@ -645,7 +645,6 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
                     # 필요한 데이터만 저장
                     post_links.append((detail_url, article_id))
 
-\
         return post_links
 
     # --------------------------------------------------
