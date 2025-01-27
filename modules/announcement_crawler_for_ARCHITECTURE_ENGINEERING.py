@@ -7,9 +7,14 @@ import os
 import re
 import json
 from datetime import datetime
+from .rotating_log_saver import RotatingLogSaver
 
 # 예시이므로, 실제로는 사용자 코드 구조에 맞춰 import 경로 수정 필요
 from .announcement_parser import AnnouncementParser
+
+from .announcement_crawler import AnnouncementCrawler
+
+
 from .fetcher import Fetcher
 from .json_manager import JsonManager
 
@@ -68,6 +73,17 @@ class ARCHITECTURE_ENGINEERING_AnnouncementCrawler:
 
         # state 로드
         self.is_first_crawl_done = False
+
+        # AnnouncementCrawler의 로깅 관련 속성들도 동일하게 초기화
+        self.log_dir = r"C:\Users\stark\Documents\GitHub\new_crawler\log"
+        # Rotating Log Savers 초기화
+        log_base_dir = os.path.join(self.log_dir, "api_logs")
+        self.issac_logger = RotatingLogSaver(log_base_dir, "issac_logs")
+        self.opensearch_logger = RotatingLogSaver(log_base_dir, "opensearch_logs")
+        
+        # AnnouncementCrawler의 메서드 바인딩
+        self.index_to_opensearch = AnnouncementCrawler.index_to_opensearch
+        self.index_to_issac = AnnouncementCrawler.index_to_issac
         
         if os.path.exists(self.state_file):
             with open(self.state_file, 'r', encoding='utf-8') as f:
@@ -310,6 +326,8 @@ class ARCHITECTURE_ENGINEERING_AnnouncementCrawler:
             # JSONL로 저장
             out_path = os.path.join(self.notices_dir, f"notices_{self.source}.jsonl")
             JsonManager.save_to_jsonl(parsed_json, out_path)
+
+            self.index_to_opensearch(parsed_json)
 
             # 크롤 상태 갱신
             if date_id > self.last_date_id:

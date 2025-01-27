@@ -12,6 +12,7 @@ import requests
 import os
 from .saver import Saver
 from urllib.parse import parse_qs, urlparse
+from .rotating_log_saver import RotatingLogSaver
 
 
 ISSAC_ENDPOINT = "https://issac.issac-dev.click/api/v1/notices"
@@ -72,7 +73,11 @@ class AnnouncementCrawler:
             batch_size=1,
             log_dir=os.path.join(self.output_dir, "insert_logs"),
         )
-
+        self.log_dir = r"C:\Users\stark\Documents\GitHub\new_crawler\log"
+        # Rotating Log Savers 초기화
+        log_base_dir = os.path.join(self.log_dir, "api_logs")
+        self.issac_logger = RotatingLogSaver(log_base_dir, "issac_logs")
+        self.opensearch_logger = RotatingLogSaver(log_base_dir, "opensearch_logs")
 
     def load_last_state(self):
         """사이트별 state 파일에서 이전 상태를 로드"""
@@ -103,8 +108,15 @@ class AnnouncementCrawler:
         """
         session = requests.Session()
 
+        is_first_check = None
+
         # 현재 페이지 URL(초기에는 state 없으면 start_url에서 시작)
-        current_url = self.last_page_url or self.start_url
+        if not self.last_page_url:
+            is_first_check = True
+            current_url = self.start_url
+        else:
+            is_first_check = False
+            current_url = self.last_page_url
 
         # 최대 max_checks번 공지를 확인
         checks_done = 0
@@ -120,19 +132,24 @@ class AnnouncementCrawler:
 
             soup = BeautifulSoup(content, "html.parser")
 
-            # 2) 다음 공지 URL 확인
-            next_notice_url = self.get_next_notice_url(soup)
-            if next_notice_url:
-                # 새 공지인지 확인
-                if self.is_new_post(next_notice_url):
-                    self.logger.info(f"[{self.source}] New notice found: {next_notice_url}")
-                    self.crawl_notices(next_notice_url, session)
-                    new_notice_found = True
-                else:
-                    self.logger.info(f"[{self.source}] Next notice is not new.")
-                    # 다음 공지가 이미 본 공지라면 => 더 이상 새 공지 없음
+            if is_first_check and self.is_new_post(current_url):
+                self.logger.info(f"[{self.source}] New notice found: {current_url}")
+                self.crawl_notices(current_url, session)
+                new_notice_found = True
             else:
-                self.logger.info(f"[{self.source}] No next notice link found.")
+                self.logger.info(f"[{self.source}] Not first check")
+                next_notice_url = self.get_next_notice_url(soup)
+                if next_notice_url:
+                    # 새 공지인지 확인
+                    if self.is_new_post(next_notice_url):
+                        self.logger.info(f"[{self.source}] New notice found: {next_notice_url}")
+                        self.crawl_notices(next_notice_url, session)
+                        new_notice_found = True
+                    else:
+                        self.logger.info(f"[{self.source}] Next notice is not new.")
+                        # 다음 공지가 이미 본 공지라면 => 더 이상 새 공지 없음
+                else:
+                    self.logger.info(f"[{self.source}] No next notice link found.")
             
             checks_done += 1
 
@@ -190,7 +207,7 @@ class AnnouncementCrawler:
             # (3) 원격 Insert (Opensearch 혹은 ISSAC API)
             # self.index_to_issac(json_data)
 
-            # self.index_to_opensearch(json_data)
+            self.index_to_opensearch(json_data)
 
             # (4) state 업데이트
             article_no = self.get_article_no_from_url(url)
@@ -254,10 +271,14 @@ class AnnouncementCrawler:
         return True
 
     def index_to_issac(self, doc):
-        """
-        ISSAC API로 공지 데이터를 전송하는 예시(필요에 맞게 수정).
-        """
+        """ISSAC API로 공지 데이터를 전송"""
         headers = {"Content-Type": "application/json"}
+        log_data = {
+            "status": "unknown",
+            "url": doc.get("url"),
+            "response": None
+        }
+        
         try:
             response = requests.post(
                 ISSAC_ENDPOINT,
@@ -266,40 +287,58 @@ class AnnouncementCrawler:
                 json=doc,
             )
             if response.status_code in [200, 201]:
+                log_data["status"] = "success"
+                log_data["response"] = response.json()
                 self.logger.info(f"[{self.source}] Inserted document to ISSAC.")
             else:
+                log_data["status"] = "failure"
+                log_data["response"] = {
+                    "status_code": response.status_code,
+                    "response_text": response.text
+                }
                 self.logger.error(f"[{self.source}] Failed to insert. {response.status_code}, {response.text}")
         except Exception as e:
+            log_data["status"] = "error"
+            log_data["response"] = {"exception": str(e)}
             self.logger.error(f"[{self.source}] Exception in index_to_issac: {e}")
-
+        
+        # 로그 저장
+        self.issac_logger.save_log(log_data)
 
     def index_to_opensearch(self, doc):
-        """
-        OpenSearch에 문서(공지)를 실시간으로 업로드하는 함수
-        doc: self.parser.parse_notice(...)로부터 받은 파싱 결과(dict)
-        """
+        """OpenSearch에 문서 업로드"""
         api_url = f"{OPENSEARCH_ENDPOINT}/{OPENSEARCH_INDEX}/_doc"
         headers = {"Content-Type": "application/json"}
-
-        result_log = {"status": "unknown", "url": doc.get("url"), "response": None}
-
+        
+        log_data = {
+            "status": "unknown",
+            "url": doc.get("url"),
+            "response": None
+        }
+        
         try:
-            # response = requests.post(issac_api_url, headers=headers, json=doc)
-            response = requests.post(api_url, auth=(OPENSEARCH_USER, OPENSEARCH_PASSWORD), headers=headers, json=doc)
+            response = requests.post(
+                api_url, 
+                auth=(OPENSEARCH_USER, OPENSEARCH_PASSWORD),
+                headers=headers,
+                json=doc
+            )
             if response.status_code in (200, 201):
                 _id = response.json()["_id"]
-                result_log["status"] = "success"
-                result_log["response"] = {"_id": _id}
+                log_data["status"] = "success"
+                log_data["response"] = {"_id": _id}
                 self.logger.info(f"Successfully inserted document!")
             else:
-                result_log["status"] = "failure"
-                result_log["response"] = {"status_code": response.status_code, "response_text": response.text}
-                self.logger.error(f"Failed to insert document. "
-                                f"status: {response.status_code}, response: {response.text}")
+                log_data["status"] = "failure"
+                log_data["response"] = {
+                    "status_code": response.status_code,
+                    "response_text": response.text
+                }
+                self.logger.error(f"Failed to insert document. status: {response.status_code}, response: {response.text}")
         except Exception as e:
-            result_log["status"] = "error"
-            result_log["response"] = {"exception": str(e)}
+            log_data["status"] = "error"
+            log_data["response"] = {"exception": str(e)}
             self.logger.error(f"Exception occurred while inserting document: {e}")
-
-        # 저장 로그를 Saver를 통해 저장
-        self.saver.save_original_data(result_log)
+        
+        # 로그 저장
+        self.opensearch_logger.save_log(log_data)

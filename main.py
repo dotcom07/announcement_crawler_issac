@@ -25,7 +25,7 @@ def process_site(source, crawler):
     """
     try:
         if isinstance(crawler, ListAnnouncementCrawler):
-            crawler.check_for_new_notices(max_pages=10)
+            crawler.check_for_new_notices(max_pages=15)
         elif isinstance(crawler, AnnouncementCrawler):
             crawler.check_for_new_notices(max_checks=1)
         elif isinstance(crawler, ARCHITECTURE_ENGINEERING_AnnouncementCrawler):

@@ -221,40 +221,41 @@ class AnnouncementParser(Parser):
                 return f"{year}-{date_text[3:5]}-{date_text[6:8]}"
             
             # 이미 YYYY-MM-DD 형식인 경우
-            if re.match(r'^\d{4}-\d{2}-\d{2}$', date_text):
+            elif re.match(r'^\d{4}-\d{2}-\d{2}$', date_text):
                 return date_text
             
             # YYYY.MM.DD 형식 처리
-            if re.match(r'^\d{4}\.\d{2}\.\d{2}$', date_text):
+            elif re.match(r'^\d{4}\.\d{2}\.\d{2}$', date_text):
                 return date_text.replace('.', '-')
             
             # YY.MM.DD 형식 처리
-            if re.match(r'^\d{2}\.\d{2}\.\d{2}$', date_text):
+            elif re.match(r'^\d{2}\.\d{2}\.\d{2}$', date_text):
                 year = int(date_text[:2])
                 year = f"20{year}" if year < 50 else f"19{year}"
                 return f"{year}-{date_text[3:5]}-{date_text[6:8]}"
             
             # YYYYMMDD 형식 처리
-            if re.match(r'^\d{8}$', date_text):
+            elif re.match(r'^\d{8}$', date_text):
                 return f"{date_text[:4]}-{date_text[4:6]}-{date_text[6:]}"
             
             # YYYY/MM/DD 형식 처리
-            if re.match(r'^\d{4}/\d{2}/\d{2}$', date_text):
+            elif re.match(r'^\d{4}/\d{2}/\d{2}$', date_text):
                 return date_text.replace('/', '-')
             
             # YY/MM/DD 형식 처리
-            if re.match(r'^\d{2}/\d{2}/\d{2}$', date_text):
+            elif re.match(r'^\d{2}/\d{2}/\d{2}$', date_text):
                 year = int(date_text[:2])
                 year = f"20{year}" if year < 50 else f"19{year}"
                 return f"{year}-{date_text[3:5]}-{date_text[6:8]}"
             
             # YYYY.MM.DD / HH:MM 형식 처리
-            if re.match(r'^\d{4}\.\d{2}\.\d{2} / \d{2}:\d{2}$', date_text):
+            elif re.match(r'^\d{4}\.\d{2}\.\d{2} / \d{2}:\d{2}$', date_text):
                 date_only = date_text.split('/')[0].strip()
                 return date_only.replace('.', '-')
             
-            self.logger.warning(f"Unknown date format: {date_text}")
-            return date_text
+            else:
+                self.logger.warning(f"Unknown date format: {date_text}")
+                return date_text
         
         except Exception as e:
             self.logger.error(f"Error standardizing date '{date_text}': {str(e)}")

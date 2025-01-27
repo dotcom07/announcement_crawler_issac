@@ -9,6 +9,7 @@ import json
 import re
 from .announcement_crawler import AnnouncementCrawler
 from config.site_config import SITES
+import time
 
 class ListAnnouncementCrawler(AnnouncementCrawler):
     """
@@ -28,47 +29,35 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
         # 사이트별 URL 빌드/목록 파싱 핸들러
         # ------------------------------
         self.build_list_url_handlers = {
-            "MAIN_DORM": self._build_list_url_main_dorm,  # p 기반
-            "ADVANCED_CONVERGENCE_ENGINEERING": self._build_list_url_sit_like,  # offset 기반
-            "CHINESE_LANGUAGE_LITERATURE": self._build_list_url_sit_like,
-            "CIVIL_ENGINEERING": self._build_list_url_sit_like,
-            "ELECTRICAL_ENGINEERING": self._build_list_url_sit_like,
-            "URBAN_ENGINEERING": self._build_list_url_sit_like,
-            "MECHANICAL_ENGINEERING": self._build_list_url_sit_like,
-            "MATERIALS_SCIENCE_ENGINEERING": self._build_list_url_mse,  # pg 기반
+            "MAIN_DORM": self._build_list_url_main_dorm,
+            "MATERIALS_SCIENCE_ENGINEERING": self._build_list_url_mse,
             "INTERNATIONAL_COLLEGE_STUDENT_SERVICES": self._build_list_url_uic_student_services,
-            "INTERNATIONAL_COLLEGE_ACADEMIC_AFFAIRS" : self._build_list_url_uic_academic_affairs, # UIC 추가
+            "INTERNATIONAL_COLLEGE_ACADEMIC_AFFAIRS": self._build_list_url_uic_academic_affairs,
             "ATMOSPHERIC_SCIENCE": self._build_list_url_atmospheric_science,
             "PHYSICS": self._build_list_url_physics,
-            "POLITICAL_SCIENCE" : self._build_list_url_political_science,
+            "POLITICAL_SCIENCE": self._build_list_url_political_science,
             "PSYCHOLOGY": self._build_list_url_psychology,
         }
+
         self.parse_list_page_handlers = {
             "MAIN_DORM": self._parse_list_page_main_dorm,
-            "ADVANCED_CONVERGENCE_ENGINEERING": self._parse_list_page_sit_like,
-            "CHINESE_LANGUAGE_LITERATURE": self._parse_list_page_sit_like,
-            "CIVIL_ENGINEERING": self._parse_list_page_sit_like,
-            "ELECTRICAL_ENGINEERING": self._parse_list_page_sit_like,
-            "URBAN_ENGINEERING": self._parse_list_page_sit_like,
-            "MECHANICAL_ENGINEERING": self._parse_list_page_sit_like,
             "MATERIALS_SCIENCE_ENGINEERING": self._parse_list_page_mse,
             "INTERNATIONAL_COLLEGE_STUDENT_SERVICES": self._parse_list_page_uic_student_services,
-            "INTERNATIONAL_COLLEGE_ACADEMIC_AFFAIRS" : self._parse_list_page_uic_academic_affairs, # UIC 추가
+            "INTERNATIONAL_COLLEGE_ACADEMIC_AFFAIRS": self._parse_list_page_uic_academic_affairs,
             "ATMOSPHERIC_SCIENCE": self._parse_list_page_atmospheric_science,
             "PHYSICS": self._parse_list_page_physics,
-            "POLITICAL_SCIENCE" : self._parse_list_page_political_science,
+            "POLITICAL_SCIENCE": self._parse_list_page_political_science,
             "PSYCHOLOGY": self._parse_list_page_psychology,
         }
 
-        # offset 기반 사이트인지 판별
-        self.is_offset_based = (self.source in [
-            "URBAN_ENGINEERING",
-            "ADVANCED_CONVERGENCE_ENGINEERING",
-            "CHINESE_LANGUAGE_LITERATURE",
-            "CIVIL_ENGINEERING",
-            "ELECTRICAL_ENGINEERING",
-            "MECHANICAL_ENGINEERING",
-        ])
+        # SIT 계열 사이트 자동 매핑
+        sit_date_selector = "#jwxe_main_content > div > div.board-wrap > div > dl:nth-child(2) > dd"
+        if self.date_selector == sit_date_selector:
+            self.build_list_url_handlers[self.source] = self._build_list_url_sit_like
+            self.parse_list_page_handlers[self.source] = self._parse_list_page_sit_like
+
+        # offset 기반 사이트인지 핸들러로 판별
+        self.is_offset_based = (self.build_list_url_handlers.get(self.source) == self._build_list_url_sit_like)
         
         self.existing_psychology_ids = set()  # 이미 저장된 article_id
         self._load_existing_psychology_ids()  # 초기화 시 한번 로드
@@ -304,7 +293,7 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
 
         # (3) 필요하다면 Opensearch/ISSAC 등 원격 전송
         # self.index_to_issac(json_data)
-        # self.index_to_opensearch(json_data)
+        self.index_to_opensearch(json_data)
 
 
         if(self.source=="POLITICAL_SCIENCE") :
@@ -383,12 +372,12 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
     def _parse_list_page_main_dorm(self, soup):
         post_links = []
 
-        # 처리할 행 선택 (데스크톱용 게시글 리스트)
+        # 데스크톱용 게시글 리스트만 처리 (모바일용 제외)
         rows = soup.select("table.table-board tbody tr.hide_when_mobile")
 
         for row in rows:
-            # 게시글 링크 추출
-            a_tag = row.select_one("td.bold a")
+            # 게시글 링크 추출 (공지사항과 일반 게시글 모두)
+            a_tag = row.select_one("td a")
             if not a_tag:
                 continue
 
@@ -409,22 +398,48 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
     # 2) 예시: SIT 계열 (offset 기반)
     # --------------------------------------------------
     def _build_list_url_sit_like(self, offset):
+        self.logger.info(f"\n[{self.source}] Building list URL with offset: {offset}\n")
         return f"{self.base_url}?mode=list&articleLimit=10&article.offset={offset}"
 
     def _parse_list_page_sit_like(self, soup):
         post_links = []
-        rows = soup.select("table.board-table tbody tr")
-        for row in rows:
+        
+        # 현재 offset 확인
+        current_offset = self.get_current_offset_from_url(soup.select_one("a.c-board-title")["href"])
+        is_first_page = (current_offset is None or current_offset == 0)
+        
+        # 1. 상단 고정 공지사항 (첫 페이지에서만)
+        if is_first_page:
+            fixed_notices = soup.select("tr.c-board-top-wrap")
+            for row in fixed_notices:
+                a_tag = row.select_one("div.c-board-title-wrap a.c-board-title")
+                if a_tag:
+                    detail_url = urljoin(self.base_url, a_tag.get("href", ""))
+                    article_id = self.get_article_no_from_url(detail_url)
+                    if article_id:
+                        post_links.append((detail_url, article_id))
+        
+        # 2. 일반 게시글 (모든 페이지)
+        normal_posts = soup.select("tr:not(.c-board-top-wrap)")
+        for row in normal_posts:
             a_tag = row.select_one("td.text-left a.c-board-title")
-            if not a_tag:
-                continue
-
-            detail_url = urljoin(self.base_url, a_tag.get("href", ""))
-            article_id = self.get_article_no_from_url(detail_url)
-
-            if article_id:
-                post_links.append((detail_url, article_id))
+            if a_tag:
+                detail_url = urljoin(self.base_url, a_tag.get("href", ""))
+                article_id = self.get_article_no_from_url(detail_url)
+                if article_id:
+                    post_links.append((detail_url, article_id))
+            
         return post_links
+
+    def get_current_offset_from_url(self, url):
+        """URL에서 현재 offset 값을 추출. 없으면 None 반환"""
+        try:
+            parsed = parse_qs(urlparse(url).query)
+            if 'article.offset' in parsed:
+                return int(parsed['article.offset'][0])
+            return None
+        except:
+            return None
 
     # --------------------------------------------------
     # 3) 예시: MSE (pg 기반)
@@ -572,12 +587,12 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
                 # site_config의 url_number 설정 활용
                 url_number = SITES[self.source].get('url_number')
                 if url_number:
-                    pattern = f'{url_number}=(\d+)'
+                    pattern = rf'{url_number}=(\d+)'  # raw string 사용
                     match = re.search(pattern, url)
                     if match:
                         return match.group(1)
             
-            # fallback: 기존 로직 (url_number가 없거나 매칭 실패한 경우)
+            # fallback: 기존 로직
             match = re.search(r'articleNo=(\d+)|idx=(\d+)|num=(\d+)|id=(\d+)', url)
             if match:
                 return next(g for g in match.groups() if g is not None)
