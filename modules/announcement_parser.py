@@ -7,7 +7,7 @@ from urllib.parse import urljoin, urlparse
 from bs4 import BeautifulSoup
 import logging
 import re
-import time
+
 class AnnouncementParser(Parser):
     def __init__(self, base_domain, logger):
         super().__init__(base_domain, logger)
@@ -201,7 +201,10 @@ class AnnouncementParser(Parser):
         # 앞뒤 공백 제거
         date_text = date_text.strip()
         
-        # 날짜 범위에서 첫 번째 날짜만 추출 (예: "2025.01.21~2025.02.15" -> "2025.01.21")
+        # 괄호 제거 (예: "(2024-01-30)" -> "2024-01-30")
+        date_text = date_text.strip('()')
+        
+        # 날짜 범위에서 첫 번째 날짜만 추출
         if '~' in date_text:
             date_text = date_text.split('~')[0].strip()
         
@@ -210,11 +213,17 @@ class AnnouncementParser(Parser):
         if date_parts:
             date_text = date_parts[0]
         
-        # 이미 YYYY-MM-DD 형식인 경우
-        if re.match(r'^\d{4}-\d{2}-\d{2}$', date_text):
-            return date_text
-        
         try:
+            # YY-MM-DD 형식을 YYYY-MM-DD로 변환
+            if re.match(r'^\d{2}-\d{2}-\d{2}$', date_text):
+                year = int(date_text[:2])
+                year = f"20{year}" if year < 50 else f"19{year}"
+                return f"{year}-{date_text[3:5]}-{date_text[6:8]}"
+            
+            # 이미 YYYY-MM-DD 형식인 경우
+            if re.match(r'^\d{4}-\d{2}-\d{2}$', date_text):
+                return date_text
+            
             # YYYY.MM.DD 형식 처리
             if re.match(r'^\d{4}\.\d{2}\.\d{2}$', date_text):
                 return date_text.replace('.', '-')
