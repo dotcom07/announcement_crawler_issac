@@ -93,7 +93,7 @@ class AnnouncementCrawler:
         }
         with open(self.state_file, "w") as f:
             json.dump(state, f)
-        self.logger.info(f"[{self.source}] Saved state. last_article_no={article_no}")
+        # self.logger.info(f"[{self.source}] Saved state. last_article_no={article_no}")
     
     
     def check_for_new_notices(self, max_checks=2):
@@ -161,7 +161,7 @@ class AnnouncementCrawler:
 
         url = notice_url
         while True:
-            self.logger.info(f"[{self.source}] Crawling notice: {url}")
+            # self.logger.info(f"[{self.source}] Crawling notice: {url}")
             content = self.fetcher.fetch_page_content(session, url, source=self.source)
             if not content:
                 self.logger.warning(f"[{self.source}] Failed to fetch content: {url}")

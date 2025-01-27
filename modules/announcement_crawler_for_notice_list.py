@@ -23,7 +23,7 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
     def __init__(self, source, base_url, start_url, url_number, **kwargs):
         super().__init__(source, base_url, start_url, url_number, **kwargs)
         self.logger = logging.getLogger("AnnouncementCrawler")
-
+        self.logger.info(f"[{self.source}] Initializing ListAnnouncementCrawler")
         # ------------------------------
         # 사이트별 URL 빌드/목록 파싱 핸들러
         # ------------------------------
@@ -69,34 +69,30 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
             "ELECTRICAL_ENGINEERING",
             "MECHANICAL_ENGINEERING",
         ])
+        
         self.existing_psychology_ids = set()  # 이미 저장된 article_id
         self._load_existing_psychology_ids()  # 초기화 시 한번 로드
 
     def _load_existing_psychology_ids(self):
-            """
-            JSONL 파일에서 article_id를 한 번 로드하여 캐시에 저장
-            """
-            if self.source == "PSYCHOLOGY":
-                file_path = os.path.join(self.notices_dir, f"notices_{self.source}.jsonl")
-                if os.path.exists(file_path):
-                    with open(file_path, "r", encoding="utf-8") as file:
-                        for line in file:
-                            try:
-                                record = json.loads(line.strip())
-                                article_id = record.get("article_id")
-                                if article_id:
-                                    self.existing_psychology_ids.add(article_id)
-                            except json.JSONDecodeError as e:
-                                self.logger.warning(f"Failed to parse line: {line}. Error: {e}")
-                    self.logger.info(f"Loaded {len(self.existing_psychology_ids)} existing article_ids for {self.source}")
-                else:
-                    self.logger.info(f"No existing JSONL file found for {self.source}. Starting fresh.")
+        """
+        별도의 article_ids 파일에서 기존 ID들을 로드
+        """
+        if self.source == "PSYCHOLOGY":
+            article_ids_file = os.path.join(self.state_dir, f"article_ids_{self.source}.txt")
+            if os.path.exists(article_ids_file):
+                with open(article_ids_file, "r", encoding="utf-8") as file:
+                    for line in file:
+                        article_id = line.strip()
+                        if article_id:
+                            self.existing_psychology_ids.add(article_id)
+                self.logger.info(f"Loaded {len(self.existing_psychology_ids)} existing article_ids for {self.source}")
+            else:
+                self.logger.info(f"No existing article_ids file found for {self.source}. Starting fresh.")
 
     # --------------------------------------------------
     # A. 메인 진입: 체크 & 크롤링
     # --------------------------------------------------
     def check_for_new_notices(self, max_pages=10, max_checks=2):
-        print("A. 메인 진입: 체크 & 크롤링\n")
         """
         state(=last_article_no)가 없으면 => _crawl_full_in_reverse
         state가 있으면 => _check_only_first_page_for_new
@@ -105,18 +101,21 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
             max_pages (int): 전체 크롤링 시 최대 페이지 수 (기본값: 10)
             max_checks (int): 첫 페이지 확인 횟수 (기본값: 2)
         """
-        if self.last_article_no is None:
-            self.logger.info(f"[{self.source}] No state => FULL CRAWL in reverse order.")
+        if self.source == "PSYCHOLOGY" and self.existing_psychology_ids == set():
+            self.logger.info(f"[{self.source}] No existing article_ids file found for {self.source}. Starting fresh.")
             self._crawl_full_in_reverse(max_pages)
-        else:
-            self.logger.info(f"[{self.source}] Found last_article_no={self.last_article_no} => check first page {max_checks} times.")
-            self._check_only_first_page_for_new(max_checks)
+        else :
+            if self.source != "PSYCHOLOGY" and self.last_article_no is None:
+                self.logger.info(f"[{self.source}] No state => FULL CRAWL in reverse order.")
+                self._crawl_full_in_reverse(max_pages)
+            else:
+                self.logger.info(f"[{self.source}] Found last_article_no={self.last_article_no} => check first page {max_checks} times.")
+                self._check_only_first_page_for_new(max_checks)
 
     # --------------------------------------------------
     # B. 전체 역순 크롤링
     # --------------------------------------------------
     def _crawl_full_in_reverse(self, max_pages=10):
-        print("B. 전체 역순 크롤링\n")
         """
         ex) offset 기반이면 40,30,20,10,0
             p 기반이면 10,9,8,7,6...1
@@ -140,7 +139,6 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
     # C. 첫 페이지에서만 새 글 확인
     # --------------------------------------------------
     def _check_only_first_page_for_new(self, max_checks=2):
-        print("C. 첫 페이지에서만 새 글 확인\n")
         """
         offset=0 또는 p=1 페이지를 가져와
         새 글(article_no > last_article_no)만 상세 크롤링
@@ -161,7 +159,6 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
     # D. 목록 페이지 처리
     # --------------------------------------------------
     def _process_list_page(self, session, page_param, first_crawl=False):
-        print("D. 목록 페이지 처리\n")
         """
         1) list_url 빌드
         2) 페이지 가져오기
@@ -171,7 +168,7 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
         list_url = self._build_list_url(page_param)
         # self.logger.info(f"[{self.source}] Fetching list page: {list_url}")
 
-        if(self.source=="POLITICAL_SCIENCE") :
+        if (self.source=="POLITICAL_SCIENCE") :
             content = self.fetcher.fetch_with_form_data(session, list_url, source=self.source, page_param=page_param)
         else : 
             content = self.fetcher.fetch_page_content(session, list_url, source=self.source)
@@ -228,11 +225,11 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
         """
         단일 게시글 상세 페이지 파싱 + 저장 + state 갱신
         """
-        print("E. 상세 페이지 크롤링\n")
         if session is None:
             session = requests.Session()
 
-        self.logger.info(f"[{self.source}] Crawling detail page: {notice_url}")
+        
+        # self.logger.info(f"[{self.source}] Crawling detail page: {notice_url}")
 
         if(self.source=="POLITICAL_SCIENCE") :
             content = self.fetcher.fetch_with_form_data(session, notice_url, source=self.source, no=article_id)
@@ -288,18 +285,34 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
         # (2) 로컬 jsonl 저장
         from .json_manager import JsonManager
         file_path = os.path.join(self.notices_dir, f"notices_{self.source}.jsonl")
-        JsonManager.save_to_jsonl(json_data, file_path)
+
+
+        if self.source=="PSYCHOLOGY" :
+            article_id_psy = json_data["article_id"]
+            json_data = {k: v for k, v in json_data.items() if k != "article_id"}
+            JsonManager.save_to_jsonl(json_data, file_path)
+
+            # article_id를 별도 파일에 저장
+            article_ids_file = os.path.join(self.state_dir, f"article_ids_{self.source}.txt")
+            with open(article_ids_file, "a", encoding="utf-8") as f:
+                f.write(f"{article_id_psy}\n")
+                
+            # 메모리의 캐시도 업데이트
+            self.existing_psychology_ids.add(article_id_psy)
+        else :
+            JsonManager.save_to_jsonl(json_data, file_path)
 
         # (3) 필요하다면 Opensearch/ISSAC 등 원격 전송
         # self.index_to_issac(json_data)
         # self.index_to_opensearch(json_data)
 
+
         if(self.source=="POLITICAL_SCIENCE") :
             article_id = article_id
         else :
             article_id = self.get_article_no_from_url(notice_url)
-        
-        print("article_id", article_id)
+
+
         if article_id and self.is_new_post_by_id(article_id):
             self.save_last_state(notice_url, article_id)
 
@@ -307,7 +320,6 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
     # F. 도우미 (URL 빌드/목록 파싱/역순 페이지 목록)
     # --------------------------------------------------
     def _generate_reverse_page_list(self, max_pages):
-        print("F. 도우미 (URL 빌드/목록 파싱/역순 페이지 목록)\n")
         """
         offset 기반 -> [ (max_pages-1)*10, ..., 0 ]
         p 기반 -> [ max_pages, ..., 1 ]
@@ -342,7 +354,7 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
         """
         article_id로 새 글인지 판별
         """
-        if self.last_article_no is None:
+        if self.source != "PSYCHOLOGY" and self.last_article_no is None:
             return True
         
         # 심리학의 경우: 로컬 JSONL 파일에서 article_id를 확인
@@ -583,7 +595,6 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
         예: https://physicsyonsei.kr/notice/board?page=1
         https://physicsyonsei.kr
         """
-        print(f"{self.base_url}/notice/board?page={page_index}")
         return f"{self.base_url}/notice/board?page={page_index}"
 
     def _parse_list_page_physics(self, soup):
@@ -607,7 +618,6 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
                 
                 if article_id:
                     post_links.append((detail_url, article_id))
-        print(post_links)
         return post_links
     
     # --------------------------------------------------
@@ -618,7 +628,6 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
         정치외교학과 게시판 목록 URL 생성(POLITICAL_SCIENCE)
         POST http://politics.yonsei.ac.kr/board.asp
         """
-        print(f"{self.base_url}/board.asp")
         return f"{self.base_url}/board.asp"
 
     def _parse_list_page_political_science(self, soup):
@@ -655,7 +664,6 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
         심리학과 게시판 목록 URL 생성(POLITICAL_SCIENCE)
         GET https://psychsci.yonsei.ac.kr/
         """
-        print(f"{self.base_url}")
         return f"{self.base_url}"
 
     def _parse_list_page_psychology(self, soup):
@@ -687,7 +695,6 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
         # 나중에 추가할 ID를 post_links의 마지막에 추가
         post_links.extend(deferred_links)
 
-        print(post_links)
         return post_links
 
     
