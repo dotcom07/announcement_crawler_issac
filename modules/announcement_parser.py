@@ -165,6 +165,7 @@ class AnnouncementParser(Parser):
     def standardize_date(self, date_text):
         """
         다양한 날짜 형식을 YYYY-MM-DD 형식으로 표준화
+        날짜 범위의 경우 첫 번째 날짜만 표준화
         """
         if not date_text:
             return ""
@@ -180,8 +181,11 @@ class AnnouncementParser(Parser):
         # 앞뒤 공백 제거
         date_text = date_text.strip()
         
+        # 날짜 범위에서 첫 번째 날짜만 추출 (예: "2025.01.21~2025.02.15" -> "2025.01.21")
+        if '~' in date_text:
+            date_text = date_text.split('~')[0].strip()
+        
         # 시간 정보가 있는 경우 날짜만 추출
-        # 예: "2024-04-26 09:17" -> "2024-04-26"
         date_parts = date_text.split()
         if date_parts:
             date_text = date_parts[0]

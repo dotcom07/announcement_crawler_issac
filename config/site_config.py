@@ -12,6 +12,17 @@ SITES = {
         "content_selector": ".fr-view",
         "next_page_selector": "#jwxe_main_content > div.jwxe_board > div > ul > li:nth-child(1) > a",
     },
+    "SCOLARSHIP" : {
+        "base_url": "https://www.yonsei.ac.kr/sc/support/scholarship.jsp",
+        "start_url": "https://www.yonsei.ac.kr/sc/support/scholarship.jsp?mode=view&article_no=243969&board_wrapper=%2Fsc%2Fsupport%2Fscholarship.jsp&pager.offset=0&board_no=29",
+        "url_number": "article_no",
+        "title_selector": "#jwxe_main_content > div.jwxe_board > div > dl > dt > strong",
+        "date_selector": "#jwxe_main_content > div.jwxe_board > div > dl > dt > span",
+        "author_selector": "null",
+        "sub_category_selector": "null",
+        "content_selector": "#jwxe_main_content > div.jwxe_board > div > dl > dd",
+        "next_page_selector": "#jwxe_main_content > div.jwxe_board > div > ul > li:nth-child(1) > a",
+    },
     "MATERIALS_SCIENCE_ENGINEERING" : {
         "base_url": "https://mse.yonsei.ac.kr/",
         "start_url": "https://mse.yonsei.ac.kr/board/board.php?bo_table=notice&cate=undergraduate&pg=2&idx=139",
@@ -818,7 +829,7 @@ SITES = {
     "POLITICAL_SCIENCE" :{
         "base_url": "http://politics.yonsei.ac.kr",
         "start_url": "http://politics.yonsei.ac.kr/board.asp?catalogid=politics&language=ko&boardcode=com01&go=&field=&keyword=&tapmenu=&page=1",
-        "url_number": "page",
+        "url_number": "articleNo",
         "title_selector": "#jwxe_main_content > div > div.board-wrap > div > dl.board-write-box.board-write-box-v01 > dd",
         "date_selector": "#jwxe_main_content > div > div.board-wrap > div > dl:nth-child(2) > dd",
         "author_selector": "#jwxe_main_content > div > div.board-wrap > div > dl:nth-child(3) > dd",

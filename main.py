@@ -38,7 +38,7 @@ def main():
     # 1) 사이트별 Crawler 인스턴스 생성
     crawlers = {}
     for source, config in SITES.items():
-        if source != "PHYSICS":
+        if source != "SCOLARSHIP":
             continue
         if config["next_page_selector"] == "null":
             crawler = ListAnnouncementCrawler(

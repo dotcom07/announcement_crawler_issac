@@ -220,6 +220,10 @@ class AnnouncementCrawler:
         if not href or "javascript" in href.lower():
             return None
         
+        if self.source == "RC_EDUCATION":
+            base_url = self.base_url + "/main/"
+            return urljoin(base_url, href)
+
         return urljoin(self.base_url, href)
 
 
