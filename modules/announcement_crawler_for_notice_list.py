@@ -142,7 +142,7 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
         4) (첫 크롤링이면) 모두 크롤 / (아니면) 새 글만 크롤
         """
         list_url = self._build_list_url(page_param)
-        self.logger.info(f"[{self.source}] Fetching list page: {list_url}")
+        # self.logger.info(f"[{self.source}] Fetching list page: {list_url}")
 
         if(self.source=="POLITICAL_SCIENCE") :
             content = self.fetcher.fetch_with_form_data(session, list_url, source=self.source, page_param=page_param)
@@ -150,7 +150,7 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
             content = self.fetcher.fetch_page_content(session, list_url, source=self.source)
 
         if not content:
-            self.logger.warning(f"[{self.source}] Failed to fetch list page: {list_url}")
+            # self.logger.warning(f"[{self.source}] Failed to fetch list page: {list_url}")
             return
 
         soup = BeautifulSoup(content, "html.parser")
@@ -226,8 +226,12 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
         # self.index_to_issac(json_data)
         # self.index_to_opensearch(json_data)
 
-        # (4) state 갱신
-        article_id = self.get_article_no_from_url(notice_url)
+        if(self.source=="POLITICAL_SCIENCE") :
+            article_id = article_id
+        else :
+            article_id = self.get_article_no_from_url(notice_url)
+        
+        print("article_id", article_id)
         if article_id and self.is_new_post_by_id(article_id):
             self.save_last_state(notice_url, article_id)
 
@@ -477,10 +481,18 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
                 if match:
                     return match.group(1)  # 예: "20250120"
             else:
-                # 기존 로직
-                match = re.search(r'articleNo=(\d+)|idx=(\d+)|num=(\d+)|id=(\d+)', url)
-                if match:
-                    return next(g for g in match.groups() if g is not None)
+                # site_config의 url_number 설정 활용
+                url_number = SITES[self.source].get('url_number')
+                if url_number:
+                    pattern = f'{url_number}=(\d+)'
+                    match = re.search(pattern, url)
+                    if match:
+                        return match.group(1)
+            
+            # fallback: 기존 로직 (url_number가 없거나 매칭 실패한 경우)
+            match = re.search(r'articleNo=(\d+)|idx=(\d+)|num=(\d+)|id=(\d+)', url)
+            if match:
+                return next(g for g in match.groups() if g is not None)
         except:
             pass
         return None
@@ -557,7 +569,6 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
                     # 필요한 데이터만 저장
                     post_links.append((detail_url, article_id))
 
-        print(post_links)
         return post_links
 
     
