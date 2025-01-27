@@ -365,7 +365,7 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
     # 1) 예시: MAIN_DORM (p 기반)
     # --------------------------------------------------
     def _build_list_url_main_dorm(self, page_index):
-        return f"{self.base_url}board/?id=notice&p={page_index}"
+        return f"{self.base_url}/board/?id=notice&p={page_index}"
 
     from urllib.parse import urljoin
 

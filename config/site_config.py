@@ -68,14 +68,14 @@ SITES = {
         "next_page_selector": "#BoardViewPreOnly > span.LableP > a",
     },
     "MAIN_DORM" : {
-        "base_url": "https://dorm.yonsei.ac.kr/",
+        "base_url": "https://dorm.yonsei.ac.kr",
         "start_url": "https://dorm.yonsei.ac.kr/board/?mode=V&idx=8291&id=notice&p=9",
         "url_number": "idx",
         "title_selector": "#mqSub-Data > div > h3",
         "date_selector": "#mqSub-Data > div > div.board-view-info > dl.writer > dd > span", 
         "author_selector": "#mqSub-Data > div > div.board-view-info > dl.writer > dd > b",
         "sub_category_selector": "#mqSub-Data > div > div.board-view > span",
-        "content_selector": "#mqSub-Data > div > div.board-view > div",
+        "content_selector": "#mqSub-Data > div > div.board-view > div.board-view-data",
         "next_page_selector": "null",
     },
     "INTERNATIONAL_OFFICE" : {

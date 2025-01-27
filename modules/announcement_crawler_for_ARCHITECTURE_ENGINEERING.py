@@ -73,17 +73,16 @@ class ARCHITECTURE_ENGINEERING_AnnouncementCrawler:
 
         # state 로드
         self.is_first_crawl_done = False
-
-        # AnnouncementCrawler의 로깅 관련 속성들도 동일하게 초기화
+        
         self.log_dir = r"C:\Users\stark\Documents\GitHub\new_crawler\log"
-        # Rotating Log Savers 초기화
+         # AnnouncementCrawler의 로깅 관련 속성들도 동일하게 초기화
         log_base_dir = os.path.join(self.log_dir, "api_logs")
         self.issac_logger = RotatingLogSaver(log_base_dir, "issac_logs")
         self.opensearch_logger = RotatingLogSaver(log_base_dir, "opensearch_logs")
         
-        # AnnouncementCrawler의 메서드 바인딩
-        self.index_to_opensearch = AnnouncementCrawler.index_to_opensearch
-        self.index_to_issac = AnnouncementCrawler.index_to_issac
+        # 메서드를 바운드 메서드로 바인딩
+        self.index_to_opensearch = AnnouncementCrawler.index_to_opensearch.__get__(self, ARCHITECTURE_ENGINEERING_AnnouncementCrawler)
+        self.index_to_issac = AnnouncementCrawler.index_to_issac.__get__(self, ARCHITECTURE_ENGINEERING_AnnouncementCrawler)
         
         if os.path.exists(self.state_file):
             with open(self.state_file, 'r', encoding='utf-8') as f:

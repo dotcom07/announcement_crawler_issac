@@ -45,31 +45,59 @@ class AnnouncementParser(Parser):
             "https://che.yonsei.ac.kr/che/reunion/download.do"
         ]
 
-        for link in soup.find_all('a', href=True):
-            href = link['href']
-            # 확장자 또는 'download'가 포함된 링크만 처리
-            if any(ext in href.lower() for ext in ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.zip', '.hwp']) or 'download' in href.lower():
-                file_url = urljoin(base_url, href)  # base_url과 결합
-                parsed = urlparse(file_url)
+        # 파일 링크를 찾을 수 있는 다양한 패턴 검색
+        link_patterns = [
+            ('a', {'href': True}),  # 기본 링크
+            ('a', {'onclick': lambda x: 'download' in x.lower() if x else False}),  # onclick 다운로드
+            ('p.file a', {}),  # 파일 클래스를 가진 p 태그 내의 링크
+            ('span[data-ellipsis="true"]', {})  # data-ellipsis 속성을 가진 span
+        ]
 
-                if file_url in excluded_urls:
+        for selector, attrs in link_patterns:
+            for element in soup.select(selector) if selector.find('.') >= 0 else soup.find_all(selector, attrs):
+                href = element.get('href', '')
+                
+                # "내려받기" 텍스트를 가진 링크 처리
+                if element.get_text(strip=True) == "내려받기":
+                    parent_p = element.find_parent('p', class_='file')
+                    if parent_p:
+                        file_name_span = parent_p.find('span', attrs={'data-ellipsis': 'true'})
+                        if file_name_span:
+                            file_name = file_name_span.get_text(strip=True)
+                            file_url = urljoin(base_url, href)
+                            if file_url not in excluded_urls:
+                                files.append({"name": file_name, "url": file_url})
                     continue
 
-                # domain 체크를 수행하는 경우
-                if parsed.scheme in ['http', 'https']:
-                    # 파일명 추출
-                    title_attr = link.get('title', '')
-                    if title_attr:
-                        file_name = title_attr.replace('다운로드', '').strip()
-                    else:
-                        file_name = link.get_text(strip=True)
+                # 일반적인 파일 링크 처리
+                if any(ext in href.lower() for ext in ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.zip', '.hwp']) or 'download' in href.lower():
+                    file_url = urljoin(base_url, href)
+                    parsed = urlparse(file_url)
 
-                    if not file_name:
-                        file_name = os.path.basename(parsed.path)
+                    if file_url in excluded_urls:
+                        continue
 
-                    files.append({"name": file_name, "url": file_url})
-                    
-        return files
+                    if parsed.scheme in ['http', 'https']:
+                        # 파일명 추출 로직
+                        title_attr = element.get('title', '')
+                        if title_attr:
+                            file_name = title_attr.replace('다운로드', '').strip()
+                        else:
+                            file_name = element.get_text(strip=True)
+
+                        if not file_name:
+                            file_name = os.path.basename(parsed.path)
+
+                        files.append({"name": file_name, "url": file_url})
+
+        # 중복 제거를 위해 URL을 키로 사용하는 딕셔너리 사용
+        unique_files = {}
+        for file_info in files:
+            url = file_info['url']
+            if url not in unique_files:
+                unique_files[url] = file_info
+        
+        return list(unique_files.values())
     
 
 
@@ -321,7 +349,7 @@ class AnnouncementParser(Parser):
             )
         else:   
             print(f"No handler found for source: {source}")
-
+        
         json_object = {
             "university": "YONSEI",
             "source": source,
@@ -423,7 +451,7 @@ class AnnouncementParser(Parser):
                     if not href.startswith('http') and not href.startswith('javascript'):
                         a_tag['href'] = urljoin(base_domain, href)
 
-
+        content_html = content_html.replace('\\"', "'")
         extracted_files = self.extract_file_links(soup, self.base_domain, source)
 
         json_object = {
@@ -433,7 +461,7 @@ class AnnouncementParser(Parser):
             "subCategory": "",
             "author": "",
             "title": title,
-            "createdDate": "",
+            "createdDate": "2025-01-01",
             "rawContent": content_html,
             "content": plainText,
             "files": extracted_files,
