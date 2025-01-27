@@ -213,9 +213,8 @@ class AnnouncementCrawler:
         
         text = link.get_text(strip=True)
         # "등록된 글이 없습니다" 같은 문구 필터
-        if "등록된 글이 없습니다" in text:
+        if "등록된 글이 없습니다" in text or "다음글이 없습니다." in text:
             return None
-        
         href = link.get("href")
         if not href or "javascript" in href.lower():
             return None
