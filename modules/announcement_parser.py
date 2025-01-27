@@ -414,8 +414,13 @@ class AnnouncementParser(Parser):
                 # href 처리
                 for a_tag in element.find_all('a', href=True):
                     href = a_tag['href']
+
                     if not href.startswith('http') and not href.startswith('javascript'):
                         a_tag['href'] = urljoin(base_domain, href)
+                    
+                    # 구글 폼 버튼 삭제
+                    if 'oWHwWc' in a_tag.get('class', []):
+                        a_tag.decompose()  # 'oWHwWc' 클래스를 가진 a 태그는 삭제
 
             # HTML 합치기
             content_html = "".join([str(element) for element in content_elements])
@@ -429,6 +434,7 @@ class AnnouncementParser(Parser):
                     first_link_added = True
                 else:
                     content_html += str(link_element)  # 나머지는 그대로 추가
+            
 
         else:
             # content_elements가 없을 경우 제목의 내용을 그대로 넣어준다
