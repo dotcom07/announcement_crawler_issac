@@ -25,7 +25,11 @@ def process_site(source, crawler):
     """
     try:
         if isinstance(crawler, ListAnnouncementCrawler):
-            crawler.check_for_new_notices(max_pages=15)
+            print("List형 크롤러 새로운 공지사항인지 체크 시작")
+            if source=="INDUSTRY_ENGINEERING":
+                crawler.check_for_new_notices(max_pages=14)
+            else :
+                crawler.check_for_new_notices(max_pages=15)
         elif isinstance(crawler, AnnouncementCrawler):
             crawler.check_for_new_notices(max_checks=1)
         elif isinstance(crawler, ARCHITECTURE_ENGINEERING_AnnouncementCrawler):
@@ -40,7 +44,7 @@ def main():
     # 1) 사이트별 Crawler 인스턴스 생성
     crawlers = {}
     for source, config in SITES.items():
-        if source != "LITERATURE_COLLEGE":
+        if source != "INTERDISCIPLINARY_MAJOR":
             continue
         if source == "ARCHITECTURE_ENGINEERING":
             crawler = ARCHITECTURE_ENGINEERING_AnnouncementCrawler(

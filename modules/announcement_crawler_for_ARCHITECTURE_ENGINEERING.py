@@ -53,7 +53,7 @@ class ARCHITECTURE_ENGINEERING_AnnouncementCrawler:
         self.logger.setLevel(logging.INFO)  # 로그 레벨 INFO 정도로
 
         # 출력/저장 디렉토리
-        self.output_dir = r"./output"
+        self.output_dir = "./output"
         os.makedirs(self.output_dir, exist_ok=True)
 
         self.notices_dir = os.path.join(self.output_dir, "notices")
@@ -74,7 +74,7 @@ class ARCHITECTURE_ENGINEERING_AnnouncementCrawler:
         # state 로드
         self.is_first_crawl_done = False
         
-        self.log_dir = r"C:\Users\stark\Documents\GitHub\new_crawler\log"
+        self.log_dir = "./log"
          # AnnouncementCrawler의 로깅 관련 속성들도 동일하게 초기화
         log_base_dir = os.path.join(self.log_dir, "api_logs")
         self.issac_logger = RotatingLogSaver(log_base_dir, "issac_logs")

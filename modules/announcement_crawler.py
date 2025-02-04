@@ -44,7 +44,7 @@ class AnnouncementCrawler:
         self.processed_urls = set()
 
         # 모든 파일을 저장할 최상위 output 디렉토리
-        self.output_dir = r"C:\Users\stark\Documents\GitHub\new_crawler\output"
+        self.output_dir = "./output"
 
         # 1) 크롤링 state 파일 (이전 상태) 저장 경로
         self.state_dir = os.path.join(self.output_dir, "crawler_state")
@@ -73,7 +73,7 @@ class AnnouncementCrawler:
             batch_size=1,
             log_dir=os.path.join(self.output_dir, "insert_logs"),
         )
-        self.log_dir = r"C:\Users\stark\Documents\GitHub\new_crawler\log"
+        self.log_dir = "./log"
         # Rotating Log Savers 초기화
         log_base_dir = os.path.join(self.log_dir, "api_logs")
         self.issac_logger = RotatingLogSaver(log_base_dir, "issac_logs")

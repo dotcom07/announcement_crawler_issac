@@ -51,8 +51,10 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
         }
 
         # SIT 계열 사이트 자동 매핑
-        sit_date_selector = "#jwxe_main_content > div > div.board-wrap > div > dl:nth-child(2) > dd"
-        if self.date_selector == sit_date_selector:
+        sit_date_selectors = ("#jwxe_main_content > div > div.board-wrap > div > dl:nth-child(2) > dd" ,"#jwxe_main_content > div > div.board-wrap > div > dl:nth-child(4) > dd" ,"#jwxe_main_content > div > div > div > dl:nth-child(4) > dd")
+        print(self.date_selector)
+        if self.date_selector in sit_date_selectors:
+            print("SIT 스타일 매핑")
             self.build_list_url_handlers[self.source] = self._build_list_url_sit_like
             self.parse_list_page_handlers[self.source] = self._parse_list_page_sit_like
 
@@ -167,7 +169,8 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
             return
 
         soup = BeautifulSoup(content, "html.parser")
-        post_links = self.parse_list_page(soup)
+        post_links = self.parse_list_page(soup) # 에러 
+        print(post_links)
         if not post_links:
             self.logger.info(f"[{self.source}] No posts found at {list_url}")
             return
@@ -333,6 +336,7 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
     def parse_list_page(self, soup):
         handler = self.parse_list_page_handlers.get(self.source)
         if handler:
+            print("헨들러에 soup pass")
             return handler(soup)
         return []
     
@@ -405,34 +409,79 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
         post_links = []
         
         # 현재 offset 확인
-        current_offset = self.get_current_offset_from_url(soup.select_one("a.c-board-title")["href"])
+        print("offset 확인")
+        # 1. 페이지 오프셋(현재 페이지 번호) 추출
+        if self.source in ("INDUSTRY_ENGINEERING", "SYSTEMS_BIOLOGY"):
+            page_offset_el = soup.select_one("div.board-wrap ul.board-list-wrap li:first-child dt a")
+        elif self.source in  ("ECONOMICS_COLLEGE", "SPORTS_APPLIED_INDUSTRY", "PHILOSOPHY", "CHINESE_LANGUAGE_LITERATURE","INTERDISCIPLINARY_MAJOR"):
+            page_offset_el = soup.select_one("tbody tr:first-child td.text-left div.c-board-title-wrap a.c-board-title")
+        else:
+            page_offset_el = soup.select_one("a.c-board-title")
+
+        href = page_offset_el.get("href", "") if page_offset_el else ""
+        if not href:
+            print("해당 요소를 찾을 수 없습니다.")
+
+        current_offset = self.get_current_offset_from_url(href)
         is_first_page = (current_offset is None or current_offset == 0)
-        
-        # 1. 상단 고정 공지사항 (첫 페이지에서만)
-        if is_first_page:
-            fixed_notices = soup.select("tr.c-board-top-wrap")
-            for row in fixed_notices:
-                a_tag = row.select_one("div.c-board-title-wrap a.c-board-title")
+
+        # 2. 게시글 추출
+        if self.source in ("INDUSTRY_ENGINEERING", "SYSTEMS_BIOLOGY"):
+            # 새 구조 처리 (UL/li 기반)
+            board_list_items = soup.select("div.board-wrap ul.board-list-wrap li")
+            for li in board_list_items:
+                # <span class="board-list-num">의 텍스트에 "공지"가 포함되어 있으면 고정 게시글로 판단
+                num_tag = li.select_one("span.board-list-num")
+                if num_tag and "공지" in num_tag.get_text(strip=True) and not is_first_page:
+                    continue  # 고정 게시글은 첫 페이지에서만 처리
+
+                a_tag = li.select_one("dt.board-list-content-title a")
                 if a_tag:
                     detail_url = urljoin(self.base_url, a_tag.get("href", ""))
                     article_id = self.get_article_no_from_url(detail_url)
                     if article_id:
                         post_links.append((detail_url, article_id))
-        
-        # 2. 일반 게시글 (모든 페이지)
-        normal_posts = soup.select("tr:not(.c-board-top-wrap)")
-        for row in normal_posts:
-            a_tag = row.select_one("td.text-left a.c-board-title")
-            if a_tag:
-                detail_url = urljoin(self.base_url, a_tag.get("href", ""))
-                article_id = self.get_article_no_from_url(detail_url)
-                if article_id:
-                    post_links.append((detail_url, article_id))
-            
-        return post_links
+            return post_links
+
+        elif self.source in  ("ECONOMICS_COLLEGE", "SPORTS_APPLIED_INDUSTRY" ,"PHILOSOPHY","CHINESE_LANGUAGE_LITERATURE","INTERDISCIPLINARY_MAJOR"):
+            # ECONOMICS_COLLEGE - table 기반 (tbody/tr)
+            table_rows = soup.select("tbody tr")
+            for row in table_rows:
+                # ECONOMICS_COLLEGE의 게시글은 <td class="text-left"> 내부의 <div class="c-board-title-wrap"> 안에 존재함
+                a_tag = row.select_one("td.text-left div.c-board-title-wrap a.c-board-title")
+                if a_tag:
+                    detail_url = urljoin(self.base_url, a_tag.get("href", ""))
+                    article_id = self.get_article_no_from_url(detail_url)
+                    if article_id:
+                        post_links.append((detail_url, article_id))
+            return post_links
+
+        else:
+            # 기존 구조 처리 (table 기반)
+            # 2-1. 상단 고정 공지사항 (첫 페이지에서만)
+            if is_first_page:
+                fixed_notices = soup.select("tr.c-board-top-wrap")
+                for row in fixed_notices:
+                    a_tag = row.select_one("div.c-board-title-wrap a.c-board-title")
+                    if a_tag:
+                        detail_url = urljoin(self.base_url, a_tag.get("href", ""))
+                        article_id = self.get_article_no_from_url(detail_url)
+                        if article_id:
+                            post_links.append((detail_url, article_id))
+            # 2-2. 일반 게시글 (모든 페이지)
+            normal_posts = soup.select("tr:not(.c-board-top-wrap)")
+            for row in normal_posts:
+                a_tag = row.select_one("td.text-left a.c-board-title")
+                if a_tag:
+                    detail_url = urljoin(self.base_url, a_tag.get("href", ""))
+                    article_id = self.get_article_no_from_url(detail_url)
+                    if article_id:
+                        post_links.append((detail_url, article_id))
+            return post_links
 
     def get_current_offset_from_url(self, url):
         """URL에서 현재 offset 값을 추출. 없으면 None 반환"""
+        print(url)
         try:
             parsed = parse_qs(urlparse(url).query)
             if 'article.offset' in parsed:

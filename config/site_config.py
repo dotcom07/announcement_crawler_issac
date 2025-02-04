@@ -463,6 +463,17 @@ SITES = {
         "content_selector": "#jwxe_main_content > div > div.board-wrap > div > dl.board-write-box.board-write-box-v03 > dd",
         "next_page_selector": "null",
     },
+    "APPLIED_STATISTICS": {
+        "base_url": "https://stat.yonsei.ac.kr/stat/board/under_notice.do",
+        "start_url": "https://stat.yonsei.ac.kr/stat/board/under_notice.do?mode=view&articleNo=218104",
+        "url_number": "articleNo",
+        "title_selector": "#jwxe_main_content > div > div.board-wrap > div > dl.board-write-box.board-write-box-v01 > dd",
+        "date_selector": "#jwxe_main_content > div > div.board-wrap > div > dl:nth-child(2) > dd",
+        "author_selector": "#jwxe_main_content > div > div.board-wrap > div > dl:nth-child(3) > dd",
+        "sub_category_selector": "null",
+        "content_selector": "#jwxe_main_content > div > div.board-wrap > div > dl.board-write-box.board-write-box-v03 > dd",
+        "next_page_selector": "null",
+    },
     "PHILOSOPHY": {
         "base_url": "https://philosophy.yonsei.ac.kr/cholhak/process/process.do",
         "start_url": "https://philosophy.yonsei.ac.kr/cholhak/process/process.do?mode=view&articleNo=178479",
@@ -576,8 +587,8 @@ SITES = {
     "INDUSTRY_ENGINEERING": {
         "base_url": "https://ie.yonsei.ac.kr/ie/community/under_notice.do",
         "start_url": "https://ie.yonsei.ac.kr/ie/community/under_notice.do?mode=view&articleNo=216430&article.offset=0&articleLimit=10",
-        "url_number": "articleNo",
-        "title_selector": "#jwxe_main_content > div > div.board-wrap > div > dl.board-write-box.board-write-box-v01 > dd",
+        "url_number": "articleNo", 
+        "title_selector": "#jwxe_main_content > div > div.board-wrap > div > dl:nth-child(1) > dd",
         "date_selector": "#jwxe_main_content > div > div.board-wrap > div > dl:nth-child(2) > dd",
         "author_selector": "#jwxe_main_content > div > div.board-wrap > div > dl:nth-child(3) > dd",
         "sub_category_selector": "null",
