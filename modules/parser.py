@@ -10,7 +10,7 @@ import logging
 
 class Parser:
     def __init__(self, base_domain, logger):
-        self.base_domain = base_domain.lower()
+        self.base_domain = base_domain
         self.logger = logger
 
     def clean_text(self, text):
