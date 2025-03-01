@@ -509,21 +509,34 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
 
     def _parse_list_page_mse(self, soup):
         post_links = []
-        rows = soup.select("div.section.section1 ul.list li")
+    
+        first_href = soup.select_one("#main > div.section.section1 > div > ul > li a").get("href", "")
+        parsed_url = urlparse(first_href)
+        query_params = parse_qs(parsed_url.query)
+        
+        # pg 값 가져오기 (없으면 기본값 1로 설정)
+        pg = int(query_params.get("pg", ["1"])[0])  # pg가 없으면 기본값 1 사용
+        if(pg==1):
+            rows = soup.select("#main > div.section.section1 > div > ul > li")  # top 클래스 제외 저장
+        else : 
+            rows = soup.select("#main > div.section.section1 > div > ul > li:not(.top)")  # top 클래스 제외 저장
         
         for row in rows:
+            # print(row)
             a_tag = row.select_one("a")
             if not a_tag:
                 continue
-            
+
             # href에서 상대 경로를 가져와서 base_url + /board/와 결합
             href = a_tag.get("href", "")
+
             if href:
                 board_base = urljoin(self.base_url, "board/")
                 detail_url = urljoin(board_base, href)
                 article_id = self.get_article_no_from_url(detail_url)
-                
+
                 if article_id:
+                    # print(article_id)
                     post_links.append((detail_url, article_id))
         
         return post_links

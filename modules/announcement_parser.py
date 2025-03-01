@@ -312,6 +312,10 @@ class AnnouncementParser(Parser):
         
         if(source=="BUSINESS_COLLEGE") :
             sub_category = pre_fetched_sub_category 
+        elif(source=="MATERIALS_SCIENCE_ENGINEERING"):
+            # [ ] 안의 값(subcategories) 추출
+            match = re.search(r"\[(.*?)\]", title_text)
+            sub_category = match.group(1) if match else ""  # 없으면 None
             
         date = soup.select_one(date_selector)
         date_text = date.get_text(strip=True) if date else ""

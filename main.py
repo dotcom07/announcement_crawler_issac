@@ -44,7 +44,7 @@ def main():
     # 1) 사이트별 Crawler 인스턴스 생성
     crawlers = {}
     for source, config in SITES.items():
-        if source != "ADVANCED_COMPUTING":
+        if source != "MATERIALS_SCIENCE_ENGINEERING":
             continue
         if source == "ARCHITECTURE_ENGINEERING":
             crawler = ARCHITECTURE_ENGINEERING_AnnouncementCrawler(
