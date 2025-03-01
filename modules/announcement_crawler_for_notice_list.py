@@ -301,7 +301,7 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
 
         # (3) 필요하다면 Opensearch/ISSAC 등 원격 전송
         # self.index_to_issac(json_data)
-        self.index_to_opensearch(json_data)
+        # self.index_to_opensearch(json_data)
 
 
         if(self.source=="POLITICAL_SCIENCE") :
@@ -815,7 +815,7 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
             href = a_tag.get("href", "")
             if href:
                 detail_url = SITES["BUSINESS_COLLEGE"]["base_url"] + href
-                article_id = row.select("td.BlindColumn")[0].text.strip()
+                article_id = self.get_article_no_from_url(detail_url)
                 post_links.append((detail_url, article_id, sub_category))
 
         return post_links
