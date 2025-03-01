@@ -90,15 +90,15 @@ SITES = {
         "next_page_selector": "#contRight > div > div > div.content > div > ul.prev_next_list > li:nth-child(2) > div > h4 > a",
     },
     "BUSINESS_COLLEGE": {
-            "base_url": "https://ysb.yonsei.ac.kr",
-            "start_url": "https://ysb.yonsei.ac.kr/board.asp?act=view&mid=m06%5F01&cmid=m06%5F01&cid=0&eid=&bgn=&bid=7&sOpt=&pact=&mType=&mCourse=&mKisu=&tabidx=&hSel=&page=20&keyword=&uid=&idx=7577&ddx=0&sdx=0",
+            "base_url": "https://ysb.yonsei.ac.kr/",
+            "start_url": "https://ysb.yonsei.ac.kr/board.asp?mid=m06%5F01&cmid=m06%5F01&cid=0&eid=&bgn=&bid=7&sOpt=&pact=&mType=&mCourse=&mKisu=&tabidx=&hSel=H001&act=list&keyword=&uid=&page=10",
             "url_number": "idx",
             "title_selector": "#BoardViewTitle",
             "date_selector": "#BoardViewAdd",
             "author_selector": "null",
             "sub_category_selector": "null",
             "content_selector": "#BoardContent",
-            "next_page_selector": "#BoardViewPreOnly > span.LableP > a",
+            "next_page_selector": "null",
         },
     "INTERNATIONAL_COLLEGE_STUDENT_SERVICES" : {
         "base_url": "https://uic.yonsei.ac.kr",

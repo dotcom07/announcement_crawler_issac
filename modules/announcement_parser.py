@@ -289,7 +289,8 @@ class AnnouncementParser(Parser):
             self.logger.error(f"Error standardizing date '{date_text}': {str(e)}")
             return date_text
 
-    def parse_notice(self, soup, base_domain, url, source, title_selector, date_selector, author_selector, content_selector, sub_category_selector):
+
+    def parse_notice(self, soup, base_domain, url, source, title_selector, date_selector, author_selector, content_selector, sub_category_selector, pre_fetched_sub_category =None):
         """
         프론트에 넘겨줄 JSON 구조에 맞게 파싱하는 메서드.
         """
@@ -308,7 +309,10 @@ class AnnouncementParser(Parser):
 
         sub_category_tag = soup.select_one(sub_category_selector)
         sub_category = sub_category_tag.get_text(strip=True) if sub_category_tag else ""
-
+        
+        if(source=="BUSINESS_COLLEGE") :
+            sub_category = pre_fetched_sub_category 
+            
         date = soup.select_one(date_selector)
         date_text = date.get_text(strip=True) if date else ""
         date_text = self.standardize_date(date_text)

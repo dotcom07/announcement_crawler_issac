@@ -92,13 +92,21 @@ class AnnouncementCrawler:
 
     def save_last_state(self, url, article_no):
         """사이트별 state 파일에 상태 저장"""
+        
+        # article_no가 None이거나 빈 문자열이면 저장하지 않음
+        if not article_no:
+            return
+
         state = {
             "last_article_no": article_no,
             "last_page_url": url,
         }
+        
         with open(self.state_file, "w") as f:
             json.dump(state, f)
+
         # self.logger.info(f"[{self.source}] Saved state. last_article_no={article_no}")
+
     
     
     def check_for_new_notices(self, max_checks=2):
@@ -141,7 +149,7 @@ class AnnouncementCrawler:
                 next_notice_url = self.get_next_notice_url(soup)
                 if next_notice_url:
                     # 새 공지인지 확인
-                    if self.is_new_post(next_notice_url):
+                    if self.is_new_post(next_noticue_url):
                         self.logger.info(f"[{self.source}] New notice found: {next_notice_url}")
                         self.crawl_notices(next_notice_url, session)
                         new_notice_found = True

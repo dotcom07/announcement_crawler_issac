@@ -37,6 +37,7 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
             "PHYSICS": self._build_list_url_physics,
             "POLITICAL_SCIENCE": self._build_list_url_political_science,
             "PSYCHOLOGY": self._build_list_url_psychology,
+            "BUSINESS_COLLEGE" : self._build_list_url_business_college
         }
 
         self.parse_list_page_handlers = {
@@ -48,6 +49,7 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
             "PHYSICS": self._parse_list_page_physics,
             "POLITICAL_SCIENCE": self._parse_list_page_political_science,
             "PSYCHOLOGY": self._parse_list_page_psychology,
+            "BUSINESS_COLLEGE" : self._parse_list_page_business_college
         }
 
         # SIT 계열 사이트 자동 매핑
@@ -197,15 +199,16 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
                         self.logger.debug(f"[{self.source}] Old post => skip: article_id={article_id}")
 
         else :
-            for post_url, article_id in post_links:
+            for post_url, article_id, *optional in post_links:
+                sub_category = optional[0] if optional else None  # 존재하면 가져오고, 없으면 None
                 if first_crawl:
                     self.logger.info(f"[{self.source}] (Full) Found post: {post_url} (article_id: {article_id})")
                     # self.crawl_notices(post_url, session=session)
-                    self.crawl_notices(post_url, session=session, article_id=article_id)
+                    self.crawl_notices(post_url, session=session, article_id=article_id, sub_category= sub_category)
                 else:
                     if self.is_new_post_by_id(article_id):
                         self.logger.info(f"[{self.source}] Found NEW post: {post_url} (article_id: {article_id})")
-                        self.crawl_notices(post_url, session=session)
+                        self.crawl_notices(post_url, session=session, sub_category= sub_category)
                     else:
                         self.logger.debug(f"[{self.source}] Old post => skip: article_id={article_id}")
 
@@ -213,7 +216,7 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
     # --------------------------------------------------
     # E. 상세 페이지 크롤링
     # --------------------------------------------------
-    def crawl_notices(self, notice_url, session=None, article_id=None):
+    def crawl_notices(self, notice_url, session=None, article_id=None, sub_category=None):
         """
         단일 게시글 상세 페이지 파싱 + 저장 + state 갱신
         """
@@ -234,12 +237,12 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
 
         soup = BeautifulSoup(content, "html.parser") 
 
-        self.process_notice_detail(soup, notice_url, article_id)
+        self.process_notice_detail(soup, notice_url, article_id, sub_category= sub_category)
 
     # --------------------------------------------------
     # E-1. 상세 페이지 데이터를 처리하는 메소드
     # --------------------------------------------------
-    def process_notice_detail(self, soup, notice_url, article_id):
+    def process_notice_detail(self, soup, notice_url, article_id, sub_category= None):
         """
         상세 페이지 데이터를 처리하는 메소드:
         1. HTML -> JSON 변환
@@ -262,6 +265,7 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
                 article_id=article_id
             )
         else :
+
             json_data = self.parser.parse_notice(
                 soup=soup,
                 base_domain=self.parser.extract_domain(notice_url),
@@ -271,7 +275,8 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
                 date_selector=self.date_selector,
                 author_selector=self.author_selector,
                 content_selector=self.content_selector,
-                sub_category_selector=self.sub_category_selector
+                sub_category_selector=self.sub_category_selector,
+                pre_fetched_sub_category=sub_category
             )
 
         # (2) 로컬 jsonl 저장
@@ -758,6 +763,47 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
 
         # 나중에 추가할 ID를 post_links의 마지막에 추가
         post_links.extend(deferred_links)
+
+        return post_links
+
+    # --------------------------------------------------
+    # K. 경영대학(학부) 게시판
+    # --------------------------------------------------
+    def _build_list_url_business_college(self, page_index):
+        """
+        경영대학(학부) 게시판 목록 URL 생성(POLITICAL_SCIENCE)
+        GET board.asp?mid=m06%5F01&cmid=m06%5F01&cid=0&eid=&bgn=&bid=7&sOpt=&pact=&mType=&mCourse=&mKisu=&tabidx=&hSel=&act=list&keyword=&uid=&page=37
+        """
+        return f"{self.base_url}/board.asp?mid=m06%5F01&cmid=m06%5F01&cid=0&eid=&bgn=&bid=7&sOpt=&pact=&mType=&mCourse=&mKisu=&tabidx=&hSel=&act=list&keyword=&uid=&page={page_index}"
+
+    def _parse_list_page_business_college(self, soup):
+        # BUSINESS_COLLEGE
+        """
+        경영대학(학부) 게시판 목록 페이지 파싱
+        """
+        post_links = []
+
+        # 목록 테이블에서 행 선택
+        rows = soup.select("#Board > tbody > tr")
+        for row in rows:
+            # 제목 링크 추출
+            a_tag = row.select_one("td.Subject > a")
+            if not a_tag:
+                continue
+            
+            title_text = a_tag.text.strip()  # 제목 텍스트 추출
+            
+            # [ ] 안의 값(subcategories) 추출
+            match = re.search(r"\[(.*?)\]", title_text)
+            sub_category = match.group(1) if match else None  # 없으면 None
+
+            # print(f"a_tag: {title_text}, subcategories: {sub_category}")  # 디버깅 출력
+
+            href = a_tag.get("href", "")
+            if href:
+                detail_url = SITES["BUSINESS_COLLEGE"]["base_url"] + href
+                article_id = row.select("td.BlindColumn")[0].text.strip()
+                post_links.append((detail_url, article_id, sub_category))
 
         return post_links
 
