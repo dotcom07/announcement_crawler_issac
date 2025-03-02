@@ -43,14 +43,22 @@ def process_site(source, crawler):
 
 def get_sleep_duration():
     """현재 한국 시간(KST)에 따라 sleep 시간을 결정하는 함수"""
-    now = datetime.now(KST).time()
+    now = datetime.now(KST)
+    current_time = now.time()
+    current_weekday = now.weekday()  # 0: 월요일 ~ 6: 일요일
 
-    if now >= datetime.strptime("00:00", "%H:%M").time() and now < datetime.strptime("09:00", "%H:%M").time():
+    # 주말 (토요일=5, 일요일=6) → 6시간(21600초) 간격 실행
+    if current_weekday in [5, 6]:  
+        return 21600  # 6시간
+
+    # 평일 (월~금)
+    if current_time >= datetime.strptime("00:00", "%H:%M").time() and current_time < datetime.strptime("09:00", "%H:%M").time():
         return None  # 00:00 ~ 09:00 크롤링 실행 안함
-    elif now >= datetime.strptime("09:00", "%H:%M").time() and now < datetime.strptime("19:00", "%H:%M").time():
-        return 600 # 09:00 ~ 19:00 (10분)
-    elif now >= datetime.strptime("19:00", "%H:%M").time() and now < datetime.strptime("23:59", "%H:%M").time():
+    elif current_time >= datetime.strptime("09:00", "%H:%M").time() and current_time < datetime.strptime("19:00", "%H:%M").time():
+        return 600  # 09:00 ~ 19:00 (10분)
+    elif current_time >= datetime.strptime("19:00", "%H:%M").time() and current_time < datetime.strptime("23:59", "%H:%M").time():
         return 7200  # 19:00 ~ 23:59 (2시간)
+
     return None  # 혹시 모를 예외 처리
 
 def main():
@@ -61,8 +69,8 @@ def main():
 
     # 최초 db에서 file 정보 업데이트 하기
     for source, config in SITES.items():
-        if source != "POLITICAL_SCIENCE":
-            continue
+        # if source != "POLITICAL_SCIENCE":
+            # continue
         if source == "ARCHITECTURE_ENGINEERING":
             crawler = ARCHITECTURE_ENGINEERING_AnnouncementCrawler(
                 source=source,
@@ -118,12 +126,18 @@ def main():
             logger.info("현재 시간에는 크롤링을 실행하지 않습니다. (자정~오전 9시)")
             now = datetime.now(KST)
             next_start = now.replace(hour=9, minute=0, second=0, microsecond=0)
+            
             if now > next_start:
                 next_start += timedelta(days=1)
+
             sleep_time = (next_start - now).total_seconds()
-            logger.info(f"{int(sleep_time / 3600)}시간 {int((sleep_time % 3600) / 60)}분 후 다시 시작합니다.")
+            sleep_hours = int(sleep_time // 3600)  # 시간 단위 변환
+            sleep_minutes = int((sleep_time % 3600) // 60)  # 분 단위 변환
+
+            logger.info(f"{sleep_hours}시간 {sleep_minutes}분 후 다시 시작합니다.")
             time.sleep(sleep_time)
             continue
+
 
         with ThreadPoolExecutor(max_workers=8) as executor:
             futures = []
