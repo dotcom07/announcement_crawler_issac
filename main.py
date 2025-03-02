@@ -2,11 +2,15 @@
 
 import time
 import logging
+from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from config.site_config import SITES
+from pytz import timezone 
+from config.site_config import SITES    
 from modules.announcement_crawler import AnnouncementCrawler
 from modules.announcement_crawler_for_notice_list import ListAnnouncementCrawler
 from modules.announcement_crawler_for_ARCHITECTURE_ENGINEERING import ARCHITECTURE_ENGINEERING_AnnouncementCrawler
+
+KST = timezone('Asia/Seoul')  
 
 def setup_logger():
     logger = logging.getLogger("AnnouncementCrawler")
@@ -37,15 +41,28 @@ def process_site(source, crawler):
     except Exception as e:
         crawler.logger.error(f"[{source}] Error in process_site: {e}")
 
+def get_sleep_duration():
+    """현재 한국 시간(KST)에 따라 sleep 시간을 결정하는 함수"""
+    now = datetime.now(KST).time()
+
+    if now >= datetime.strptime("00:00", "%H:%M").time() and now < datetime.strptime("09:00", "%H:%M").time():
+        return None  # 00:00 ~ 09:00 크롤링 실행 안함
+    elif now >= datetime.strptime("09:00", "%H:%M").time() and now < datetime.strptime("19:00", "%H:%M").time():
+        return 600 # 09:00 ~ 19:00 (10분)
+    elif now >= datetime.strptime("19:00", "%H:%M").time() and now < datetime.strptime("23:59", "%H:%M").time():
+        return 7200  # 19:00 ~ 23:59 (2시간)
+    return None  # 혹시 모를 예외 처리
 
 def main():
     logger = setup_logger()
     
     # 1) 사이트별 Crawler 인스턴스 생성
     crawlers = {}
+
+    # 최초 db에서 file 정보 업데이트 하기
     for source, config in SITES.items():
-        # if source != "ATMOSPHERIC_SCIENCE":
-            # continue
+        if source != "POLITICAL_SCIENCE":
+            continue
         if source == "ARCHITECTURE_ENGINEERING":
             crawler = ARCHITECTURE_ENGINEERING_AnnouncementCrawler(
                 source=source,
@@ -95,6 +112,19 @@ def main():
     while True:
         logger.info("=== Start checking all sites ===")
         
+        sleep_duration = get_sleep_duration()
+
+        if sleep_duration is None:
+            logger.info("현재 시간에는 크롤링을 실행하지 않습니다. (자정~오전 9시)")
+            now = datetime.now(KST)
+            next_start = now.replace(hour=9, minute=0, second=0, microsecond=0)
+            if now > next_start:
+                next_start += timedelta(days=1)
+            sleep_time = (next_start - now).total_seconds()
+            logger.info(f"{int(sleep_time / 3600)}시간 {int((sleep_time % 3600) / 60)}분 후 다시 시작합니다.")
+            time.sleep(sleep_time)
+            continue
+
         with ThreadPoolExecutor(max_workers=8) as executor:
             futures = []
             
@@ -110,8 +140,10 @@ def main():
                 except Exception as e:
                     logger.error(f"[{source}] Future Error: {e}")
         
-        logger.info("=== Finished checking all sites. Waiting for 1 hour... ===")
-        time.sleep(3600)  # 1시간 대기 후 재시도
+        wait_hours = sleep_duration // 3600
+        wait_minutes = (sleep_duration % 3600) // 60
+        logger.info(f"=== Finished checking all sites. Waiting for {wait_hours} hour(s) {wait_minutes} minute(s)... ===")
+        time.sleep(sleep_duration)
 
 
 if __name__ == "__main__":

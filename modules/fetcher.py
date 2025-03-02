@@ -55,7 +55,7 @@ class Fetcher:
         headers['User-Agent'] = random.choice(self.USER_AGENTS)
         return headers
 
-    def fetch_page_content(self, session, url, source=None, retries=10, backoff_factor=2, max_backoff=100, initial_timeout=30, max_total_timeout=200):
+    def fetch_page_content(self, session, url, source=None, retries=3, backoff_factor=2, max_backoff=100, initial_timeout=30, max_total_timeout=200):
         headers = self.get_headers(source) if source else {'User-Agent': random.choice(self.USER_AGENTS)}
         attempt = 0
         backoff = backoff_factor  # 초기 대기 시간 (초)
