@@ -208,7 +208,7 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
                 else:
                     if self.is_new_post_by_id(article_id):
                         self.logger.info(f"[{self.source}] Found NEW post: {post_url} (article_id: {article_id})")
-                        self.crawl_notices(post_url, session=session, sub_category= sub_category)
+                        self.crawl_notices(post_url, session=session, article_id={article_id}, sub_category= sub_category)
                     else:
                         self.logger.debug(f"[{self.source}] Old post => skip: article_id={article_id}")
 
