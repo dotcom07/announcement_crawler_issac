@@ -301,7 +301,7 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
 
         # (3) 필요하다면 Opensearch/ISSAC 등 원격 전송
         # self.index_to_issac(json_data)
-        # self.index_to_opensearch(json_data)
+        self.index_to_opensearch(json_data)
 
 
         if(self.source=="POLITICAL_SCIENCE") :

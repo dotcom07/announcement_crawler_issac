@@ -149,7 +149,7 @@ class AnnouncementCrawler:
                 next_notice_url = self.get_next_notice_url(soup)
                 if next_notice_url:
                     # 새 공지인지 확인
-                    if self.is_new_post(next_noticue_url):
+                    if self.is_new_post(next_notice_url):
                         self.logger.info(f"[{self.source}] New notice found: {next_notice_url}")
                         self.crawl_notices(next_notice_url, session)
                         new_notice_found = True
@@ -215,7 +215,7 @@ class AnnouncementCrawler:
             # (3) 원격 Insert (Opensearch 혹은 ISSAC API)
             # self.index_to_issac(json_data)
 
-            # self.index_to_opensearch(json_data)
+            self.index_to_opensearch(json_data)
 
             # (4) state 업데이트
             article_no = self.get_article_no_from_url(url)
