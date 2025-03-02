@@ -11,6 +11,7 @@ from .announcement_crawler import AnnouncementCrawler
 from config.site_config import SITES
 import time
 
+
 class ListAnnouncementCrawler(AnnouncementCrawler):
     """
     분할 정복(모듈화) 예시:
@@ -294,6 +295,7 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
             with open(article_ids_file, "a", encoding="utf-8") as f:
                 f.write(f"{article_id_psy}\n")
                 
+
             # 메모리의 캐시도 업데이트
             self.existing_psychology_ids.add(article_id_psy)
         else :

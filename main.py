@@ -9,7 +9,9 @@ from config.site_config import SITES
 from modules.announcement_crawler import AnnouncementCrawler
 from modules.announcement_crawler_for_notice_list import ListAnnouncementCrawler
 from modules.announcement_crawler_for_ARCHITECTURE_ENGINEERING import ARCHITECTURE_ENGINEERING_AnnouncementCrawler
-
+import os
+from modules.mongo_saver import save_crawler_states_to_mongo, save_psychology_article_ids, save_architecture_engineering_state
+from modules.mongo_loader import save_crawler_states_to_files
 KST = timezone('Asia/Seoul')  
 
 def setup_logger():
@@ -61,9 +63,13 @@ def get_sleep_duration():
 
     return None  # 혹시 모를 예외 처리
 
+
 def main():
     logger = setup_logger()
     
+
+    save_crawler_states_to_files()
+
     # 1) 사이트별 Crawler 인스턴스 생성
     crawlers = {}
 
@@ -138,7 +144,7 @@ def main():
             time.sleep(sleep_time)
             continue
 
-
+        
         with ThreadPoolExecutor(max_workers=8) as executor:
             futures = []
             
@@ -156,6 +162,9 @@ def main():
         
         wait_hours = sleep_duration // 3600
         wait_minutes = (sleep_duration % 3600) // 60
+        save_crawler_states_to_mongo(crawlers)
+        save_psychology_article_ids()
+        save_architecture_engineering_state()
         logger.info(f"=== Finished checking all sites. Waiting for {wait_hours} hour(s) {wait_minutes} minute(s)... ===")
         time.sleep(sleep_duration)
 
