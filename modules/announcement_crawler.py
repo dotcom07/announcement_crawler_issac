@@ -213,9 +213,9 @@ class AnnouncementCrawler:
             JsonManager.save_to_jsonl(json_data, file_path)
 
             # (3) 원격 Insert (Opensearch 혹은 ISSAC API)
-            # self.index_to_issac(json_data)
+            self.index_to_issac(json_data)
 
-            self.index_to_opensearch(json_data)
+            # self.index_to_opensearch(json_data)
 
             # (4) state 업데이트
             article_no = self.get_article_no_from_url(url)

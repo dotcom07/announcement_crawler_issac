@@ -326,7 +326,9 @@ class ARCHITECTURE_ENGINEERING_AnnouncementCrawler:
             out_path = os.path.join(self.notices_dir, f"notices_{self.source}.jsonl")
             JsonManager.save_to_jsonl(parsed_json, out_path)
 
-            self.index_to_opensearch(parsed_json)
+            self.index_to_issac(parsed_json)
+            
+            # self.index_to_opensearch(parsed_json)
 
             # 크롤 상태 갱신
             if date_id > self.last_date_id:

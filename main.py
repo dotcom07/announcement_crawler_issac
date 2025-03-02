@@ -43,30 +43,33 @@ def process_site(source, crawler):
     except Exception as e:
         crawler.logger.error(f"[{source}] Error in process_site: {e}")
 
-def get_sleep_duration():
-    """현재 한국 시간(KST)에 따라 sleep 시간을 결정하는 함수"""
+def get_next_run_time():
+    """다음 실행 시간을 정확히 계산하는 함수"""
     now = datetime.now(KST)
-    current_time = now.time()
     current_weekday = now.weekday()  # 0: 월요일 ~ 6: 일요일
 
-    # 주말 (토요일=5, 일요일=6) → 6시간(21600초) 간격 실행
-    if current_weekday in [5, 6]:  
-        return 21600  # 6시간
+    if current_weekday in [5, 6]:  # 주말 (토, 일)
+        next_times = ["09:00", "12:00", "18:00", "00:00"]
+    else:  # 평일 (월~금)
+        next_times = ["09:00"] + [f"{h}:00" for h in range(9, 19, 1)] + ["18:00", "20:00", "22:00", "00:00"]
 
-    # 평일 (월~금)
-    if current_time >= datetime.strptime("00:00", "%H:%M").time() and current_time < datetime.strptime("09:00", "%H:%M").time():
-        return None  # 00:00 ~ 09:00 크롤링 실행 안함
-    elif current_time >= datetime.strptime("09:00", "%H:%M").time() and current_time < datetime.strptime("19:00", "%H:%M").time():
-        return 600  # 09:00 ~ 19:00 (10분)
-    elif current_time >= datetime.strptime("19:00", "%H:%M").time() and current_time < datetime.strptime("23:59", "%H:%M").time():
-        return 7200  # 19:00 ~ 23:59 (2시간)
+    # 현재 시간 이후의 실행 시간을 찾음
+    for next_time in next_times:
+        next_run = datetime.strptime(next_time, "%H:%M").replace(
+            year=now.year, month=now.month, day=now.day
+        )
+        next_run = KST.localize(next_run)  # 여기가 핵심!
+        if next_time == "00:00":
+            next_run += timedelta(days=1)  # 자정은 다음 날로 설정
+        
+        if now < next_run:
+            return next_run
 
-    return None  # 혹시 모를 예외 처리
+    return None  # 혹시 예외가 발생하면 None 반환
 
 
 def main():
     logger = setup_logger()
-    
 
     save_crawler_states_to_files()
 
@@ -126,25 +129,6 @@ def main():
     while True:
         logger.info("=== Start checking all sites ===")
         
-        sleep_duration = get_sleep_duration()
-
-        if sleep_duration is None:
-            logger.info("현재 시간에는 크롤링을 실행하지 않습니다. (자정~오전 9시)")
-            now = datetime.now(KST)
-            next_start = now.replace(hour=9, minute=0, second=0, microsecond=0)
-            
-            if now > next_start:
-                next_start += timedelta(days=1)
-
-            sleep_time = (next_start - now).total_seconds()
-            sleep_hours = int(sleep_time // 3600)  # 시간 단위 변환
-            sleep_minutes = int((sleep_time % 3600) // 60)  # 분 단위 변환
-
-            logger.info(f"{sleep_hours}시간 {sleep_minutes}분 후 다시 시작합니다.")
-            time.sleep(sleep_time)
-            continue
-
-        
         with ThreadPoolExecutor(max_workers=8) as executor:
             futures = []
             
@@ -160,13 +144,21 @@ def main():
                 except Exception as e:
                     logger.error(f"[{source}] Future Error: {e}")
         
-        wait_hours = sleep_duration // 3600
-        wait_minutes = (sleep_duration % 3600) // 60
+        next_run = get_next_run_time()
+        if not next_run:
+            logger.error("다음 실행 시간을 계산할 수 없습니다.")
+            break
+        
+        sleep_time = (next_run - datetime.now(KST)).total_seconds()
+        sleep_hours = int(sleep_time // 3600)  
+        sleep_minutes = int((sleep_time % 3600) // 60)  
+
         save_crawler_states_to_mongo(crawlers)
         save_psychology_article_ids()
         save_architecture_engineering_state()
-        logger.info(f"=== Finished checking all sites. Waiting for {wait_hours} hour(s) {wait_minutes} minute(s)... ===")
-        time.sleep(sleep_duration)
+        logger.info(f"=== Finished checking all sites. Next run at {next_run.strftime('%Y-%m-%d %H:%M:%S')} "
+              f"({sleep_hours}시간 {sleep_minutes}분 후) ===")
+        time.sleep(sleep_time)
 
 
 if __name__ == "__main__":
