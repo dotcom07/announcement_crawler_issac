@@ -5,3 +5,6 @@ modules/__pycache__/**
 test.py
 *.jsonl
 *.pyc
+
+
+output/crawler_state/
