@@ -51,7 +51,18 @@ def get_next_run_time():
     if current_weekday in [5, 6]:  # 주말 (토, 일)
         next_times = ["09:00", "12:00", "18:00", "00:00"]
     else:  # 평일 (월~금)
-        next_times = ["09:00"] + [f"{h}:00" for h in range(9, 19, 1)] + ["18:00", "20:00", "22:00", "00:00"]
+        # 09:00 ~ 18:00까지 10분 간격 생성
+        next_times = []
+        start_time = time(9, 0)  # 09:00
+        end_time = time(18, 0)  # 18:00
+        current_time = datetime.combine(now.date(), start_time)
+
+        while current_time.time() <= end_time:
+            next_times.append(current_time.strftime("%H:%M"))
+            current_time += timedelta(minutes=10)
+
+        # 18:00 이후 추가 시간
+        next_times += ["18:00", "20:00", "22:00", "00:00"]
 
     # 현재 시간 이후의 실행 시간을 찾음
     for next_time in next_times:
@@ -71,7 +82,7 @@ def get_next_run_time():
 def main():
     logger = setup_logger()
 
-    save_crawler_states_to_files()
+    # save_crawler_states_to_files()
 
     # 1) 사이트별 Crawler 인스턴스 생성
     crawlers = {}
