@@ -19,7 +19,7 @@ ISSAC_ENDPOINT = "https://issac.issac-dev.click/api/v1/notices"
 ISSAC_USER = "issac"
 ISSAC_PASSWORD = "StrongPass!2025"
 
-OPENSEARCH_ENDPOINT = "https://search-issac-pd5jfsetumxcg6ciyfpowgi5fi.ap-northeast-2.es.amazonaws.com"
+OPENSEARCH_ENDPOINT = "https://search-isaac-7vp3trcpuwavry2wcbl4fkmamq.ap-northeast-2.es.amazonaws.com"
 OPENSEARCH_USER = "issac"
 OPENSEARCH_PASSWORD = "StrongPass!2025"
 OPENSEARCH_INDEX = "notice"
