@@ -141,11 +141,17 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
             max_checks (int): 첫 페이지 확인 횟수
         """
         session = requests.Session()
-        first_page_param = 0 if self.is_offset_based else 1
+        if self.source == "BUSINESS_COLLEGE":
+            for page_param in range(1, 6):  # 1부터 5페이지까지 확인
+                for check in range(max_checks):
+                    self.logger.info(f"[{self.source}] Checking page {page_param} (attempt {check + 1}/{max_checks})")
+                    self._process_list_page(session, page_param, first_crawl=False)
+        else :
+            first_page_param = 0 if self.is_offset_based else 1
 
-        for check in range(max_checks):
-            self.logger.info(f"[{self.source}] Checking first page (attempt {check + 1}/{max_checks})")
-            self._process_list_page(session, first_page_param, first_crawl=False)
+            for check in range(max_checks):
+                self.logger.info(f"[{self.source}] Checking first page (attempt {check + 1}/{max_checks})")
+                self._process_list_page(session, first_page_param, first_crawl=False)
         
         session.close()
 
