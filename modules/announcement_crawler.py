@@ -106,7 +106,7 @@ class AnnouncementCrawler:
             json.dump(state, f)
 
         # self.logger.info(f"[{self.source}] Saved state. last_article_no={article_no}")
-
+        self.last_article_no = article_no
     
     
     def check_for_new_notices(self, max_checks=2):
