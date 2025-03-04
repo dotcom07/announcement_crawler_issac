@@ -2,7 +2,7 @@
 
 import requests
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlparse, parse_qs
+from urllib.parse import urljoin, urlparse, parse_qs, unquote
 import logging
 import os
 import json
@@ -159,6 +159,7 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
         3) parse_list_page (링크,url_number)
         4) (첫 크롤링이면) 모두 크롤 / (아니면) 새 글만 크롤
         """
+
         list_url = self._build_list_url(page_param)
         # self.logger.info(f"[{self.source}] Fetching list page: {list_url}")
 
@@ -172,6 +173,7 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
             return
 
         soup = BeautifulSoup(content, "html.parser")
+
         post_links = self.parse_list_page(soup) # 에러 
         print(post_links)
         if not post_links:
@@ -686,7 +688,8 @@ class ListAnnouncementCrawler(AnnouncementCrawler):
         물리학과 게시판 목록 페이지 파싱
         """
         post_links = []
-        rows = soup.select("table.bl_list tbody tr")
+
+        rows = soup.select("table.bl_list tbody tr:not(.bl_notice)")
         
         for row in rows:
             # 제목 링크 추출

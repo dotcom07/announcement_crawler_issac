@@ -86,7 +86,7 @@ def get_next_run_time():
 def main():
     logger = setup_logger()
 
-    # save_crawler_states_to_files()
+    save_crawler_states_to_files()
 
     # 1) 사이트별 Crawler 인스턴스 생성
     crawlers = {}
