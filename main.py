@@ -1,6 +1,6 @@
 # /home/ubuntu/multiturn_ver1/new crawler/main.py
 
-import time
+
 import logging
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -12,6 +12,10 @@ from modules.announcement_crawler_for_ARCHITECTURE_ENGINEERING import ARCHITECTU
 import os
 from modules.mongo_saver import save_crawler_states_to_mongo, save_psychology_article_ids, save_architecture_engineering_state
 from modules.mongo_loader import save_crawler_states_to_files
+
+import time  # time 모듈
+from datetime import time as dt_time  # datetime.time을 다른 이름으로 불러오기
+
 KST = timezone('Asia/Seoul')  
 
 def setup_logger():
@@ -53,8 +57,8 @@ def get_next_run_time():
     else:  # 평일 (월~금)
         # 09:00 ~ 18:00까지 10분 간격 생성
         next_times = []
-        start_time = time(9, 0)  # 09:00
-        end_time = time(18, 0)  # 18:00
+        start_time = dt_time(9, 0)  # 09:00
+        end_time = dt_time(18, 0)  # 18:00
         current_time = datetime.combine(now.date(), start_time)
 
         while current_time.time() <= end_time:
